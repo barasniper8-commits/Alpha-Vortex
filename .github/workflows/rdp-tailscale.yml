@@ -181,10 +181,10 @@ jobs:
         $rdpUser =$env:RDP_USER;
         $rdpPass =$env:RDP_PASS;
         
-        $msgText = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* $tsIp`n👤 *User:* $rdpUser`n🔑 *Password:* $rdpPass`n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_";
+        $msgText = "⚡ [ RDP CYBERPUNK READY ] ⚡`n`n🖥️ IP RDP: $tsIp`n👤 User: $rdpUser`n🔑 Password: $rdpPass`n`nSilakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!";
         $encodedMsg = [System.Web.HttpUtility]::UrlEncode($msgText);
         
-        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$encodedMsg&parse_mode=Markdown";
+        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$encodedMsg";
         
         try {
             Invoke-RestMethod -Uri $uri -Method Get;
