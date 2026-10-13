@@ -1,4 +1,4 @@
-Name: Windows RDP Cyberpunk
+name: Windows RDP Cyberpunk
 
 on:
   workflow_dispatch:
@@ -182,16 +182,11 @@ jobs:
         $rdpUser =$env:RDP_USER;
         $rdpPass =$env:RDP_PASS;
         
-        # URL Gambar/Banner yang akan dikirim bersama pesan
         $photoUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgRFqAvUV6j9-n3L65cySSsdK3JHZ88fKJlquXCK5pGhNRRlOmYfnIb3Zk4Y7SUC232-P5VcYgFZgiJ7jPfTR4HUmKtiOLG60FzYgby4m52MHOgXB0JuV5KZaR_3tdOPH5USQOqBx2GHYj_KTnntxjNzKKIh0VPFLAOaNoBlVJZi13KPvoWgjRRseVZObA/s1600/1000184023.jpg";
         
         $msgText = "⚡ [ RDP CYBERPUNK READY ] ⚡`n`n🖥️ IP RDP: $tsIp`n👤 User: $rdpUser`n🔑 Password: $rdpPass`n`nSilakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!";
         
-        $encodedCaption = [System.Web.HttpUtility]::UrlEncode($msgText);
-        $encodedPhoto = [System.Web.HttpUtility]::UrlEncode($photoUrl);
-        
-        # Menggunakan API sendPhoto dari Telegram
-        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendPhoto?chat_id=$env:CHAT_ID&photo=$encodedPhoto&caption=$encodedCaption";
+        $encodedCaption = [System.Web.HttpUtility]::UrlEncode($msgText);$encodedPhoto = [System.Web.HttpUtility]::UrlEncode($photoUrl);$uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendPhoto?chat_id=$env:CHAT_ID&photo=$encodedPhoto&caption=$encodedCaption";
         
         try {
             Invoke-RestMethod -Uri $uri -Method Get;
