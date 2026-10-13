@@ -1,4 +1,4 @@
-name: Windows RDP Cyberpunk
+name: Windows RDP & Telegram Bot Cyberpunk
 
 on:
   workflow_dispatch:
@@ -23,13 +23,29 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 150
+    timeout-minutes: 360
 
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Membaca & Memvalidasi
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Dependencies Bot
+      run: npm install
+
+    - name: Jalankan Bot Telegram di Background
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      shell: pwsh
+      run: |
+        Start-Process -FilePath "node" -ArgumentList "index.js" -NoNewWindow
+        Write-Host "Status: Bot Telegram Cyberpunk berhasil dijalankan di background."
+
+    - name: Membaca & Memvalidasi Web
       id: fetch-cred
       shell: pwsh
       run: |
@@ -76,7 +92,7 @@ jobs:
             Write-Output "web_passwords=${{ github.event.inputs.input_password }}" >> $env:GITHUB_OUTPUT
         }
 
-    - name: Konfigurasi Tampilan 
+    - name: Konfigurasi Tampilan Dark Mode
       shell: pwsh
       run: |
         Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -Value 0
@@ -94,7 +110,7 @@ jobs:
         net localgroup administrators $inputUser /add
         Write-Host "Status: Akun RDP '$inputUser' berhasil dibuat dan berstatus Administrator."
 
-    - name: Set tampilan
+    - name: Set Foto Profil & Wallpaper Desktop
       env:
         RDP_USER: ${{ github.event.inputs.input_user }}
       shell: pwsh
@@ -137,7 +153,7 @@ jobs:
             Write-Output "Peringatan: Gagal mengunduh wallpaper, melewati bagian ini..."
         }
 
-    - name: loading . . .
+    - name: Buat Teks Informasi Pemilik di Desktop
       shell: pwsh
       run: |
         $desktopPath = [Environment]::GetFolderPath('CommonDesktopDirectory')
@@ -148,7 +164,7 @@ jobs:
         Set-Content -Path "$desktopPath\INFORMASI_PEMILIK_VPS.txt" -Value $msgContent -Encoding UTF8
         Write-Output "File informasi teks berhasil dibuat di desktop."
 
-    - name: Instalasi & Koneksi Tailscale VPN (Windows MSI)
+    - name: Instalasi & Koneksi Tailscale VPN
       shell: pwsh
       run: |
         $installer = "$env:TEMP\tailscale-setup.msi"
@@ -174,15 +190,17 @@ jobs:
       run: |
         $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
         
-        # Beri jeda 10 detik agar IP Tailscale benar-benar terhubung dan terbaca
         Start-Sleep -Seconds 10
-        $tsIp = (&$tailscalePath ip -4).Trim()
+        $rawIp = &$tailscalePath ip -4
+        $tsIp = ($rawIp | Select-Object -First 1).Trim()
         
         if (-not $tsIp) {$tsIp = "Gagal Mendapatkan IP (Cek Tailscale Console)"
         }
         
-        $msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡%0A%0A🖥️ *IP RDP:* `$tsIp`%0A👤 *User:* `$env:RDP_USER`%0A🔑 *Password:* `$env:RDP_PASS`%0A%0A_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
-        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$msg&parse_mode=Markdown"
+        $u = $env:RDP_USER$p = $env:RDP_PASS$msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* $tsIp`n👤 *User:* $u`n🔑 *Password:* $p`n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
+        
+        $encodedMsg = [uri]::EscapeDataString($msg)
+        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$encodedMsg&parse_mode=Markdown"
         
         try {
             Invoke-RestMethod -Uri $uri -Method Get
@@ -203,7 +221,7 @@ jobs:
     - name: Menjaga Workflow Tetap Aktif
       shell: pwsh
       run: |
-        Write-Host "VPS RDP Cyberpunk berhasil diaktifkan dan terhubung ke jaringan Tailscale!"
+        Write-Host "VPS RDP Cyberpunk & Bot Telegram berhasil diaktifkan!"
         while ($true) {
             Start-Sleep -Seconds 30
         }
