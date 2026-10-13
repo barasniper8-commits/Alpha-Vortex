@@ -180,7 +180,7 @@ jobs:
         if (-not $tsIp) {$tsIp = "Gagal Mendapatkan IP (Cek Tailscale Console)"
         }
         
-        $u = $env:RDP_USER$p = $env:RDP_PASS$msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* `$tsIp` `n👤 *User:* `$u` `n🔑 *Password:* `$p` `n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
+        $msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* $tsIp`n👤 *User:* $env:RDP_USER`n🔑 *Password:* $env:RDP_PASS`n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
         
         $encodedMsg = [uri]::EscapeDataString($msg)
         $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$encodedMsg&parse_mode=Markdown"
