@@ -76,7 +76,7 @@ Tailscale key : ( autkey )
         caption: vortexText,
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
-          [Markup.button.url('🔑 AMBIL PASSCODE', 'https://lynk.id')],
+          [Markup.button.url('🔑 AMBIL PASSCODE', 'https://arianto12.lynk.id/p/linsensi-key')],
           [Markup.button.url('🐙 GITHUB REPO', 'https://github.com')]
         ])
       }
