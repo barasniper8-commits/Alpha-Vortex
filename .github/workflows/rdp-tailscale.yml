@@ -29,7 +29,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Membaca & Memvalidasi
+    - name: Membaca & Memvalidasi Web
       id: fetch-cred
       shell: pwsh
       run: |
@@ -76,7 +76,7 @@ jobs:
             Write-Output "web_passwords=${{ github.event.inputs.input_password }}" >> $env:GITHUB_OUTPUT
         }
 
-    - name: Konfigurasi Tampilan 
+    - name: Konfigurasi Tampilan Dark Mode
       shell: pwsh
       run: |
         Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -Value 0
@@ -94,7 +94,7 @@ jobs:
         net localgroup administrators $inputUser /add
         Write-Host "Status: Akun RDP '$inputUser' berhasil dibuat dan berstatus Administrator."
 
-    - name: Set tampilan
+    - name: Set Foto Profil & Wallpaper Desktop
       env:
         RDP_USER: ${{ github.event.inputs.input_user }}
       shell: pwsh
@@ -137,7 +137,7 @@ jobs:
             Write-Output "Peringatan: Gagal mengunduh wallpaper, melewati bagian ini..."
         }
 
-    - name: loading . . .
+    - name: Buat Teks Informasi Pemilik di Desktop
       shell: pwsh
       run: |
         $desktopPath = [Environment]::GetFolderPath('CommonDesktopDirectory')
@@ -148,7 +148,7 @@ jobs:
         Set-Content -Path "$desktopPath\INFORMASI_PEMILIK_VPS.txt" -Value $msgContent -Encoding UTF8
         Write-Output "File informasi teks berhasil dibuat di desktop."
 
-    - name: Instalasi & Koneksi Tailscale VPN (Windows MSI)
+    - name: Instalasi & Koneksi Tailscale VPN
       shell: pwsh
       run: |
         $installer = "$env:TEMP\tailscale-setup.msi"
@@ -173,16 +173,14 @@ jobs:
       shell: pwsh
       run: |
         $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
-        
         Start-Sleep -Seconds 10
-        $tsIp = (&$tailscalePath ip -4).Trim()
         
-        if (-not $tsIp) {$tsIp = "Gagal Mendapatkan IP (Cek Tailscale Console)"
-        }
+        $tsIp = (&$tailscalePath ip -4 | Select-Object -First 1).Trim()
+        if (-not $tsIp) {$tsIp = "Cek Console Tailscale" }
         
-        $msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* $tsIp`n👤 *User:* $env:RDP_USER`n🔑 *Password:* $env:RDP_PASS`n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
+        $rdpUser = $env:RDP_USER$rdpPass = $env:RDP_PASS$msgText = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* $tsIp`n👤 *User:* $rdpUser`n🔑 *Password:* $rdpPass`n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
+        $encodedMsg = [System.Web.HttpUtility]::UrlEncode($msgText)
         
-        $encodedMsg = [uri]::EscapeDataString($msg)
         $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$encodedMsg&parse_mode=Markdown"
         
         try {
@@ -204,7 +202,7 @@ jobs:
     - name: Menjaga Workflow Tetap Aktif
       shell: pwsh
       run: |
-        Write-Host "VPS RDP Cyberpunk berhasil diaktifkan dan terhubung ke jaringan Tailscale!"
+        Write-Host "VPS RDP Cyberpunk berhasil diaktifkan!"
         while ($true) {
             Start-Sleep -Seconds 30
         }
