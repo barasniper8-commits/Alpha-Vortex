@@ -13,7 +13,7 @@ const welcomeMessage = `
 
 Berikut adalah informasi kontak & panduan layanan kami:
 
-👤 <b>Admin Utama:</b> @username_admin
+👤 <b>Admin Utama:</b> @Arianto2508
 ⏰ <b>Jam Operasional:</b> 08:00 - 22:00 WIB
 📌 <b>Status:</b> <code>Online</code>
 
