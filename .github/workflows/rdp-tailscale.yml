@@ -1,4 +1,4 @@
-name: Windows RDP Cyberpunk
+Name: Windows RDP Cyberpunk
 
 on:
   workflow_dispatch:
@@ -181,14 +181,22 @@ jobs:
         $rdpUser =$env:RDP_USER;
         $rdpPass =$env:RDP_PASS;
         
-        $msgText = "⚡ [ RDP CYBERPUNK READY ] ⚡`n`n🖥️ IP RDP: $tsIp`n👤 User: $rdpUser`n🔑 Password: $rdpPass`n`nSilakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!";
-        $encodedMsg = [System.Web.HttpUtility]::UrlEncode($msgText);
+        $cyberImageUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhyXdBxoMyhb5juk8wG1w95vF5HK42SvvvTBhmGcmjphTSU2amlHfcgemfQ_8s19UeibTTwkr_4iOlcEYDZsEcgX6TZ9vi6FeaCYpTwx38F_fqzeTG-Vu8qcdgjLq32Lo6oiwj0f81X75trYVIw6VURTkYcwNe4Pk_j_HxluE-dSD-TtCKO7bQP5HRdhZ8/w1684-h1069-p-k-no-nu/1000186620.png"
         
-        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$encodedMsg";
+        $msgText = "⚡ [ RDP CYBERPUNK READY ] ⚡`n`n🖥️ IP RDP: $tsIp`n👤 User: $rdpUser`n🔑 Password: $rdpPass`n`nSilakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!"
+        
+        $body = @{
+            chat_id = $env:CHAT_ID
+            photo = $cyberImageUrl
+            caption = $msgText
+            parse_mode = "HTML"
+        }
+        
+        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendPhoto";
         
         try {
-            Invoke-RestMethod -Uri $uri -Method Get;
-            Write-Host "Status: Informasi RDP berhasil dikirim ke Telegram Anda!";
+            Invoke-RestMethod -Uri $uri -Method Post -Body$body;
+            Write-Host "Status: Informasi RDP beserta gambar berhasil dikirim ke Telegram Anda!";
         } catch {
             Write-Host "Peringatan: Gagal mengirim pesan ke Telegram: $_";
         }
