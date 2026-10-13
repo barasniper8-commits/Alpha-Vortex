@@ -36,8 +36,8 @@ bot.start(async (ctx) => {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [
-            Markup.button.url('💬 Chat Admin', 't.me/Arianto2508'),
-            Markup.button.url('📢 Channel Info', 'https://t.me/telegram')
+            Markup.button.url('💬 Chat Admin', 'https://t.me/Arianto2508'),
+            Markup.button.url('📢 Channel Info', 'https://t.me/Devcorerdp')
           ],
           [
             Markup.button.callback('ℹ️ Bantuan', 'btn_help')
