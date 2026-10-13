@@ -3,19 +3,17 @@ const { Telegraf, Markup } = require('telegraf');
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // URL Gambar Tema Cyberpunk Pro
-const CYBER_IMAGE_URL = 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800';
+const CYBER_IMAGE_URL = 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhmN4r8QQGWBuwdrDIE14cm92glQ6NGb20JY9-3fQ-fqBA4tMU5jCnqT-IGypusofrW6mHYJ4_SfTl0mehMAwKf1hI_rbDz_XUxRLfhQG0wZ_Zutv14soi931Rx1tR6bRafIaCp0oGpTc2dYShTbHJWHKbKrosZRMUwHG5i0wl25-f3B4wNZPT1nkdRdO0/s1600/1000184069.jpg';
 
 // Pesan Sambutan Cyberpunk Pro
 const cyberpunkWelcome = `
-⚡ <b>[ SYSTEM INITIALIZED: CYBERNETIC_CORE ]</b> ⚡
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-ACCESS GRANTED // PROTOCOL: SECURE
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>👋 Selamat Datang di Bot Resmi Admin!</b>
 
-🤖 <b>RDP & AUTOMATION CONTROL INTERFACE</b>
-Selamat datang di terminal utama sistem. Silakan pilih menu navigasi di bawah untuk mengakses layanan:
+Berikut adalah informasi kontak & panduan layanan kami:
 
-⚙️ <b>SYSTEM STATUS:</b> <code>ONLINE [CYBERPUNK PRO]</code>
+👤 <b>Admin Utama:</b> @username_admin
+⏰ <b>Jam Operasional:</b> 08:00 - 22:00 WIB
+🟢 <b>Status:</b> <code>Online</code>
 `;
 
 // 6 Tombol Menu Cyberpunk
