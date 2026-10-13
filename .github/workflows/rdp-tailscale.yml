@@ -173,11 +173,23 @@ jobs:
       shell: pwsh
       run: |
         $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
-        $tsIp = &$tailscalePath ip -4$msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡%0A%0A🖥️ *IP RDP:* `$tsIp`%0A👤 *User:* `$env:RDP_USER`%0A🔑 *Password:* `$env:RDP_PASS`%0A%0A_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
+        
+        # Beri jeda 10 detik agar IP Tailscale benar-benar terhubung dan terbaca
+        Start-Sleep -Seconds 10
+        $tsIp = (&$tailscalePath ip -4).Trim()
+        
+        if (-not $tsIp) {$tsIp = "Gagal Mendapatkan IP (Cek Tailscale Console)"
+        }
+        
+        $msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡%0A%0A🖥️ *IP RDP:* `$tsIp`%0A👤 *User:* `$env:RDP_USER`%0A🔑 *Password:* `$env:RDP_PASS`%0A%0A_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
         $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$msg&parse_mode=Markdown"
         
-        Invoke-RestMethod -Uri $uri -Method Get
-        Write-Host "Status: Informasi RDP berhasil dikirim ke Telegram Anda!"
+        try {
+            Invoke-RestMethod -Uri $uri -Method Get
+            Write-Host "Status: Informasi RDP berhasil dikirim ke Telegram Anda!"
+        } catch {
+            Write-Host "Peringatan: Gagal mengirim pesan ke Telegram: $_"
+        }
 
     - name: Mengaktifkan Fitur Remote Desktop (RDP)
       shell: pwsh
