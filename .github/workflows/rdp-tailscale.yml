@@ -103,6 +103,7 @@ jobs:
         $avatarPath = "C:\ProgramData\Microsoft\User Account Pictures"
         
         try {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
             $wc = New-Object System.Net.WebClient
             $wc.Headers.Add("User-Agent", "Mozilla/5.0")
             $wc.DownloadFile($avatarUrl, "C:\avatar.jpg")
@@ -125,16 +126,33 @@ jobs:
 
         $wallpaperUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgRFqAvUV6j9-n3L65cySSsdK3JHZ88fKJlquXCK5pGhNRRlOmYfnIb3Zk4Y7SUC232-P5VcYgFZgiJ7jPfTR4HUmKtiOLG60FzYgby4m52MHOgXB0JuV5KZaR_3tdOPH5USQOqBx2GHYj_KTnntxjNzKKIh0VPFLAOaNoBlVJZi13KPvoWgjRRseVZObA/s1600/1000184023.jpg"
         try {
-            $wcW = New-Object System.Net.WebClient
-            $wcW.Headers.Add("User-Agent", "Mozilla/5.0")
-            $wcW.DownloadFile($wallpaperUrl, "C:\wallpaper.jpg")
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
             
-            takeown /f "C:\Windows\Web\Wallpaper\Windows\img0.jpg"
-            icacls "C:\Windows\Web\Wallpaper\Windows\img0.jpg" /grant Administrators:F
-            Copy-Item "C:\wallpaper.jpg" "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Force
-            Write-Output "Wallpaper berhasil dipasang."
+            # Coba metode Invoke-WebRequest terlebih dahulu
+            Invoke-WebRequest -Uri $wallpaperUrl -OutFile "C:\wallpaper.jpg" -UserAgent "Mozilla/5.0" -UseBasicParsing
+            
+            if (Test-Path "C:\wallpaper.jpg") {
+                takeown /f "C:\Windows\Web\Wallpaper\Windows\img0.jpg" /a
+                icacls "C:\Windows\Web\Wallpaper\Windows\img0.jpg" /grant "Administrators:F"
+                Copy-Item "C:\wallpaper.jpg" "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Force
+                Write-Output "Wallpaper berhasil dipasang."
+            } else {
+                throw "File wallpaper kosong."
+            }
         } catch {
-            Write-Output "Peringatan: Gagal mengunduh wallpaper, melewati bagian ini..."
+            Write-Output "Mencoba metode alternatif unduh wallpaper..."
+            try {
+                $wcW = New-Object System.Net.WebClient
+                $wcW.Headers.Add("User-Agent", "Mozilla/5.0")
+                $wcW.DownloadFile($wallpaperUrl, "C:\wallpaper.jpg")
+                
+                takeown /f "C:\Windows\Web\Wallpaper\Windows\img0.jpg" /a
+                icacls "C:\Windows\Web\Wallpaper\Windows\img0.jpg" /grant "Administrators:F"
+                Copy-Item "C:\wallpaper.jpg" "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Force
+                Write-Output "Wallpaper berhasil dipasang menggunakan metode alternatif."
+            } catch {
+                Write-Output "Peringatan: Gagal total mengunduh wallpaper: $_"
+            }
         }
 
     - name: Buat Teks Informasi Pemilik di Desktop
