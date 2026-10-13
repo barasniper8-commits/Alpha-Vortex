@@ -5,7 +5,7 @@ const { Telegraf, Markup } = require('telegraf');
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // URL Gambar Admin / Profil (Bisa diganti dengan link gambar Anda sendiri)
-const ADMIN_IMAGE_URL = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=800';
+const ADMIN_IMAGE_URL = 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhmN4r8QQGWBuwdrDIE14cm92glQ6NGb20JY9-3fQ-fqBA4tMU5jCnqT-IGypusofrW6mHYJ4_SfTl0mehMAwKf1hI_rbDz_XUxRLfhQG0wZ_Zutv14soi931Rx1tR6bRafIaCp0oGpTc2dYShTbHJWHKbKrosZRMUwHG5i0wl25-f3B4wNZPT1nkdRdO0/s1600/1000184069.jpg';
 
 // Format Pesan Selamat Datang & Info Admin (Mendukung HTML)
 const welcomeMessage = `
