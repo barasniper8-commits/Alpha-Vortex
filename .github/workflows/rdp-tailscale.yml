@@ -36,6 +36,7 @@ jobs:
         $u1 = "https://arianto1"
         $u2 = "2.lynk.id/p/ganjay"
         $targetUrl = "$u1$u2"
+        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
@@ -47,33 +48,21 @@ jobs:
             $plainText = [System.Text.RegularExpressions.Regex]::Replace($webContent, "<[^>]+>", " ")
             
             $validPassCodes = @()
-            $validUsers = @()
-            $validPasswords = @()
-
             if ($plainText -match "passcode\s*[:=]\s*([^\r\n]+)") {
                 $validPassCodes = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
             }
-            if ($plainText -match "user\s*[:=]\s*([^\r\n]+)") {
-                $validUsers = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
-            }
-            if ($plainText -match "password\s*[:=]\s*([^\r\n]+)") {
-                $validPasswords = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
-            }
-
             if ($validPassCodes.Count -eq 0) { $validPassCodes = @($plainText -split '\s+') }
-            if ($validUsers.Count -eq 0) { $validUsers = @("${{ github.event.inputs.input_user }}") }
-            if ($validPasswords.Count -eq 0) { $validPasswords = @("${{ github.event.inputs.input_password }}") }
 
-            Write-Output "web_paskodes=$($validPassCodes -join ',')" >> $env:GITHUB_OUTPUT
-            Write-Output "web_users=$($validUsers -join ',')" >> $env:GITHUB_OUTPUT
-            Write-Output "web_passwords=$($validPasswords -join ',')" >> $env:GITHUB_OUTPUT
-            
-            Write-Host "Status: Data dari Lynk.id berhasil diakses."
+            # Validasi Passcode: Jika tidak cocok, gagalkan workflow dan hentikan proses
+            if ($validPassCodes -notcontains $inputPassCode) {
+                Write-Error "❌ [GAGAL] Passcode '$inputPassCode' salah atau tidak terdaftar di web! Workflow dihentikan."
+                exit 1
+            }
+
+            Write-Host "Status: Passcode valid dan data dari Lynk.id berhasil diverifikasi."
         } catch {
-            Write-Host "Peringatan: Gagal membaca halaman web, melanjutkan proses dengan input pengguna."
-            Write-Output "web_paskodes=bypass" >> $env:GITHUB_OUTPUT
-            Write-Output "web_users=${{ github.event.inputs.input_user }}" >> $env:GITHUB_OUTPUT
-            Write-Output "web_passwords=${{ github.event.inputs.input_password }}" >> $env:GITHUB_OUTPUT
+            Write-Error "❌ [GAGAL] Gagal mengakses web atau verifikasi error: $_"
+            exit 1
         }
 
     - name: Konfigurasi Tampilan Dark Mode
@@ -190,12 +179,12 @@ jobs:
             photo = $cyberImageUrl
             caption = $msgText
             parse_mode = "HTML"
-        }
+        } | ConvertTo-Json
         
         $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendPhoto";
         
         try {
-            Invoke-RestMethod -Uri $uri -Method Post -Body$body;
+            Invoke-RestMethod -Uri $uri -Method Post -ContentType "application/json" -Body $body;
             Write-Host "Status: Informasi RDP beserta gambar berhasil dikirim ke Telegram Anda!";
         } catch {
             Write-Host "Peringatan: Gagal mengirim pesan ke Telegram: $_";
@@ -204,11 +193,10 @@ jobs:
     - name: Mengaktifkan Fitur Remote Desktop (RDP)
       shell: pwsh
       run: |
-        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Write-Host "Status: RDP Service aktif & Passcode terverifikasi."
+        Write-Host "Status: RDP Service aktif."
 
     - name: Menjaga Workflow Tetap Aktif
       shell: pwsh
