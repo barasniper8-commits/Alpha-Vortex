@@ -10,13 +10,13 @@ function getWelcomeMessage(ctx) {
   const userName = ctx.from && ctx.from.first_name ? ctx.from.first_name : 'Agent';
   return `
 WELCOME AGENT <b>${userName}</b> 🕵️‍♂️!
-━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━
 🎮 <b>PANEL INSTRUKSI RDP:</b>
 1️⃣ 🚀 Jalankan Workflow <b>Windows RDP Cyberpunk</b>
 2️⃣ 🔐 Masukkan Passcode, User, Pass & Auth Key
 3️⃣ 📥 IP & Akses RDP dikirim otomatis ke chat ini!
 
-━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━
 `;
 }
 
