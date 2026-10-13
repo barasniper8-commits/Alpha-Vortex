@@ -99,7 +99,6 @@ jobs:
         RDP_USER: ${{ github.event.inputs.input_user }}
       shell: pwsh
       run: |
-        # 1. Download & Pasang Foto Profil User (Format JPG)
         $avatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjFqQRxOHnZXYINO_52beLKrfrMypBHzpnllWSHx6gQHO4yspMqi2skpfp8z0lvsOOWHjSJ6G33I8Y2rGXo8_FVAkrgnDxtYuWK_Z5go81NcvEoRV6koacWRU4HsXD0R3nqW69a1FJnxhzy2PI8z2PQKqxWIEc_mX3oOROBIj9Y3HW4NcEq6FcNzMyMMwA/s1600/1000184069.jpg"
         $avatarPath = "C:\ProgramData\Microsoft\User Account Pictures"
         
@@ -124,7 +123,6 @@ jobs:
             Write-Output "Peringatan: Gagal mengunduh foto profil: $_"
         }
 
-        # 2. Download & Pasang Wallpaper Desktop
         $wallpaperUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgRFqAvUV6j9-n3L65cySSsdK3JHZ88fKJlquXCK5pGhNRRlOmYfnIb3Zk4Y7SUC232-P5VcYgFZgiJ7jPfTR4HUmKtiOLG60FzYgby4m52MHOgXB0JuV5KZaR_3tdOPH5USQOqBx2GHYj_KTnntxjNzKKIh0VPFLAOaNoBlVJZi13KPvoWgjRRseVZObA/s1600/1000184023.jpg"
         try {
             $wcW = New-Object System.Net.WebClient
@@ -166,20 +164,29 @@ jobs:
         Write-Host "IP TAILSCALE VPS ANDA: $tsIp" -ForegroundColor Cyan
         Write-Host "=========================================="
 
+    - name: Kirim Informasi RDP ke Telegram Bot
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        CHAT_ID: "1908469040"
+        RDP_USER: ${{ github.event.inputs.input_user }}
+        RDP_PASS: ${{ github.event.inputs.input_password }}
+      shell: pwsh
+      run: |
+        $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
+        $tsIp = &$tailscalePath ip -4$msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡%0A%0A🖥️ *IP RDP:* `$tsIp`%0A👤 *User:* `$env:RDP_USER`%0A🔑 *Password:* `$env:RDP_PASS`%0A%0A_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
+        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$msg&parse_mode=Markdown"
+        
+        Invoke-RestMethod -Uri $uri -Method Get
+        Write-Host "Status: Informasi RDP berhasil dikirim ke Telegram Anda!"
+
     - name: Mengaktifkan Fitur Remote Desktop (RDP)
       shell: pwsh
       run: |
+        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Write-Host "Status: RDP Service aktif."
-
-    - name: Verifikasi Passcode dari Web
-      shell: pwsh
-      run: |
-        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
-        Write-Host "::add-mask::$inputPassCode"
-        Write-Host "Status: Passcode berhasil diverifikasi."
+        Write-Host "Status: RDP Service aktif & Passcode terverifikasi."
 
     - name: Menjaga Workflow Tetap Aktif
       shell: pwsh
