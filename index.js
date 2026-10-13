@@ -3,7 +3,7 @@ const { Telegraf, Markup } = require('telegraf');
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // URL Gambar Tema Cyberpunk Pro
-const CYBER_IMAGE_URL = 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800';
+const CYBER_IMAGE_URL = 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhyXdBxoMyhb5juk8wG1w95vF5HK42SvvvTBhmGcmjphTSU2amlHfcgemfQ_8s19UeibTTwkr_4iOlcEYDZsEcgX6TZ9vi6FeaCYpTwx38F_fqzeTG-Vu8qcdgjLq32Lo6oiwj0f81X75trYVIw6VURTkYcwNe4Pk_j_HxluE-dSD-TtCKO7bQP5HRdhZ8/w1684-h1069-p-k-no-nu/1000186620.png';
 
 // Function Dinamis untuk Membuat Pesan Sambutan Cyberpunk (Menggunakan ctx)
 function getWelcomeMessage(ctx) {
@@ -12,13 +12,13 @@ function getWelcomeMessage(ctx) {
 
 WELCOME AGENT <b>${userName}</b> 🕵️‍♂️!
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 🎮 <b>PANEL INSTRUKSI RDP:</b>
 1️⃣ 🚀 Jalankan Workflow <b>Windows RDP Cyberpunk</b>
 2️⃣ 🔐 Masukkan Passcode, User, Pass & Auth Key
 3️⃣ 📥 IP & Akses RDP dikirim otomatis ke chat ini!
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 `;
 }
 
