@@ -1,18 +1,19 @@
+
 name: Windows RDP Cyberpunk
 
 on:
   workflow_dispatch:
     inputs:
       pass_code:
-        description: 'Masukkan Pass Kode (salah satu dari web)'
+        description: 'Masukkan Pass Kode dari web'
         required: true
         type: string
       input_user:
-        description: 'Masukkan Username RDP (salah satu dari web)'
+        description: 'Masukkan Username RDP'
         required: true
         type: string
       input_password:
-        description: 'Masukkan Password RDP (sesuai user)'
+        description: 'Masukkan Password RDP'
         required: true
         type: string
       tailscale_key:
@@ -20,188 +21,400 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 150
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Membaca & Memvalidasi Web
-      id: fetch-cred
-      shell: pwsh
-      run: |
-        $u1 = "https://arianto1"
-        $u2 = "2.lynk.id/p/ganjay"
-        $targetUrl = "$u1$u2"
-        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
-        
-        [Console]::WriteLine("::add-mask::$targetUrl")
-        
-        try {
-            $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
-            $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
-            $webContent = $response.Content
-            
-            $plainText = [System.Text.RegularExpressions.Regex]::Replace($webContent, "<[^>]+>", " ")
-            
-            $validPassCodes = @()
-            if ($plainText -match "passcode\s*[:=]\s*([^\r\n]+)") {
-                $validPassCodes = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
+      - name: Validasi Input dan Membaca Web
+        id: validate
+        shell: pwsh
+        env:
+          PASS_CODE: ${{ inputs.pass_code }}
+          INPUT_USER: ${{ inputs.input_user }}
+          INPUT_PASSWORD: ${{ inputs.input_password }}
+          TAILSCALE_KEY: ${{ inputs.tailscale_key }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          foreach ($secret in @(
+            $env:PASS_CODE,
+            $env:INPUT_PASSWORD,
+            $env:TAILSCALE_KEY
+          )) {
+            if ($secret) {
+              Write-Output "::add-mask::$secret"
             }
-            if ($validPassCodes.Count -eq 0) { $validPassCodes = @($plainText -split '\s+') }
+          }
 
-            # Validasi Passcode: Jika tidak cocok, gagalkan workflow dan hentikan proses
-            if ($validPassCodes -notcontains $inputPassCode) {
-                Write-Error "❌ [GAGAL] Passcode '$inputPassCode' salah atau tidak terdaftar di web! Workflow dihentikan."
-                exit 1
+          if ($env:INPUT_USER -notmatch '^[a-zA-Z0-9_.-]{1,20}$') {
+            throw "Format username tidak valid."
+          }
+
+          if ([string]::IsNullOrWhiteSpace($env:INPUT_PASSWORD) -or
+              $env:INPUT_PASSWORD.Length -lt 12) {
+            throw "Gunakan password minimal 12 karakter."
+          }
+
+          if ($env:PASS_CODE -notmatch '^[a-zA-Z0-9_-]{4,100}$') {
+            throw "Format passcode tidak valid."
+          }
+
+          if (-not $env:TAILSCALE_KEY.StartsWith("tskey-")) {
+            throw "Format Tailscale Auth Key tidak valid."
+          }
+
+          $targetUrl = "https://arianto12.lynk.id/p/ganjay"
+
+          try {
+            $response = Invoke-WebRequest `
+              -Uri $targetUrl `
+              -UseBasicParsing `
+              -TimeoutSec 25 `
+              -Headers @{ "User-Agent" = "Mozilla/5.0" }
+
+            $html = $response.Content
+
+            # Mengambil teks halaman, bukan menganggap semua teks
+            # sebagai passcode yang valid.
+            $text = [System.Net.WebUtility]::HtmlDecode(
+              [regex]::Replace($html, '<[^>]*>', ' ')
+            )
+
+            $passMatch = [regex]::Match(
+              $text,
+              '(?i)pass[\s_-]*code\s*[:=]\s*([A-Z0-9_-]+)'
+            )
+
+            if (-not $passMatch.Success) {
+              throw "Passcode tidak ditemukan pada halaman web."
             }
 
-            Write-Host "Status: Passcode valid dan data dari Lynk.id berhasil diverifikasi."
-        } catch {
-            Write-Error "❌ [GAGAL] Gagal mengakses web atau verifikasi error: $_"
-            exit 1
-        }
+            $allowedCode = $passMatch.Groups[1].Value.Trim()
 
-    - name: Konfigurasi Tampilan Dark Mode
-      shell: pwsh
-      run: |
-        Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -Value 0
-        Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'SystemUsesLightTheme' -Value 0
+            if ($env:PASS_CODE -cne $allowedCode) {
+              throw "Passcode tidak cocok dengan data halaman web."
+            }
 
-    - name: Verifikasi & Pembuatan Akun RDP
-      shell: pwsh
-      run: |
-        $inputUser = "${{ github.event.inputs.input_user }}".Trim()
-        $inputPass = "${{ github.event.inputs.input_password }}".Trim()
-        
-        Write-Host "::add-mask::$inputPass"
+            Write-Host "Validasi passcode berhasil."
+          }
+          catch {
+            Write-Host "Validasi gagal: $($_.Exception.Message)"
+            throw
+          }
 
-        net user $inputUser $inputPass /add
-        net localgroup administrators $inputUser /add
-        Write-Host "Status: Akun RDP '$inputUser' berhasil dibuat dan berstatus Administrator."
+          # Lindungi nilai sensitif agar tidak muncul di log.
+          Write-Host "Input telah lolos validasi dasar."
 
-    - name: Set Foto Profil & Wallpaper Desktop
-      env:
-        RDP_USER: ${{ github.event.inputs.input_user }}
-      shell: pwsh
-      run: |
-        $avatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjFqQRxOHnZXYINO_52beLKrfrMypBHzpnllWSHx6gQHO4yspMqi2skpfp8z0lvsOOWHjSJ6G33I8Y2rGXo8_FVAkrgnDxtYuWK_Z5go81NcvEoRV6koacWRU4HsXD0R3nqW69a1FJnxhzy2PI8z2PQKqxWIEc_mX3oOROBIj9Y3HW4NcEq6FcNzMyMMwA/s1600/1000184069.jpg"
-        $avatarPath = "C:\ProgramData\Microsoft\User Account Pictures"
-        
-        try {
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0")
-            $wc.DownloadFile($avatarUrl, "C:\avatar.jpg")
-            
-            if (-not (Test-Path $avatarPath)) { New-Item -ItemType Directory -Force -Path $avatarPath }
-            
-            Copy-Item "C:\avatar.jpg" "$avatarPath\$env:RDP_USER.jpg" -Force
-            Copy-Item "C:\avatar.jpg" "$avatarPath\default.jpg" -Force
-            
-            $userSid = (New-Object System.Security.Principal.NTAccount($env:RDP_USER)).Translate([System.Security.Principal.SecurityIdentifier]).Value
-            $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AccountPicture\Users\$userSid"
-            if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-            
-            New-ItemProperty -Path $regPath -Name "Image448" -Value "C:\avatar.jpg" -PropertyType String -Force | Out-Null
-            New-ItemProperty -Path $regPath -Name "Image192" -Value "C:\avatar.jpg" -PropertyType String -Force | Out-Null
-            Write-Output "Foto profil JPG berhasil dipasang."
-        } catch {
-            Write-Output "Peringatan: Gagal mengunduh foto profil: $_"
-        }
+      - name: Konfigurasi Dark Mode Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
 
-        $wallpaperUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgRFqAvUV6j9-n3L65cySSsdK3JHZ88fKJlquXCK5pGhNRRlOmYfnIb3Zk4Y7SUC232-P5VcYgFZgiJ7jPfTR4HUmKtiOLG60FzYgby4m52MHOgXB0JuV5KZaR_3tdOPH5USQOqBx2GHYj_KTnntxjNzKKIh0VPFLAOaNoBlVJZi13KPvoWgjRRseVZObA/s1600/1000184023.jpg"
-        try {
-            $wcW = New-Object System.Net.WebClient
-            $wcW.Headers.Add("User-Agent", "Mozilla/5.0")
-            $wcW.DownloadFile($wallpaperUrl, "C:\wallpaper.jpg")
-            
-            takeown /f "C:\Windows\Web\Wallpaper\Windows\img0.jpg"
-            icacls "C:\Windows\Web\Wallpaper\Windows\img0.jpg" /grant Administrators:F
-            Copy-Item "C:\wallpaper.jpg" "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Force
-            Write-Output "Wallpaper berhasil dipasang."
-        } catch {
-            Write-Output "Peringatan: Gagal mengunduh wallpaper, melewati bagian ini..."
-        }
+          $personalize = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize"
 
-    - name: Buat Teks Informasi Pemilik di Desktop
-      shell: pwsh
-      run: |
-        $desktopPath = [Environment]::GetFolderPath('CommonDesktopDirectory')
-        if (-not (Test-Path $desktopPath)) { $desktopPath = "C:\Users\Public\Desktop" }
-        
-        $msgContent = "======================================`nMILIK ARIANTO`n======================`nDesktop free terima kasih sudah beli token`ndan semoga lancar rezeki sehat selalu.`n======================`n@Arianto 2026 Lumajang Candipuro`n@WhatsApp 0831-2211-6267"
-        
-        Set-Content -Path "$desktopPath\INFORMASI_PEMILIK_VPS.txt" -Value $msgContent -Encoding UTF8
-        Write-Output "File informasi teks berhasil dibuat di desktop."
+          if (-not (Test-Path $personalize)) {
+            New-Item -Path $personalize -Force | Out-Null
+          }
 
-    - name: Instalasi & Koneksi Tailscale VPN
-      shell: pwsh
-      run: |
-        $installer = "$env:TEMP\tailscale-setup.msi"
-        Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.88.4-amd64.msi" -OutFile $installer
-        Start-Process msiexec.exe -Wait -ArgumentList "/i $installer /quiet /norestart"
-        
-        $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
-        & $tailscalePath up --authkey="${{ github.event.inputs.tailscale_key }}" --accept-routes
-        
-        Start-Sleep -Seconds 5
-        $tsIp = &$tailscalePath ip -4
-        Write-Host "=========================================="
-        Write-Host "IP TAILSCALE VPS ANDA: $tsIp" -ForegroundColor Cyan
-        Write-Host "=========================================="
+          Set-ItemProperty -Path $personalize `
+            -Name AppsUseLightTheme -Value 0 -Type DWord
 
-    - name: Kirim Informasi RDP ke Telegram Bot
-      env:
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        CHAT_ID: "1908469040"
-        RDP_USER: ${{ github.event.inputs.input_user }}
-        RDP_PASS: ${{ github.event.inputs.input_password }}
-      shell: pwsh
-      run: |
-        $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe";
-        Start-Sleep -Seconds 10;
-        
-        $tsIp = (&$tailscalePath ip -4 | Select-Object -First 1).Trim();
-        if (-not $tsIp) {$tsIp = "Cek Console Tailscale" };
-        
-        $rdpUser =$env:RDP_USER;
-        $rdpPass =$env:RDP_PASS;
-        
-        $cyberImageUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhyXdBxoMyhb5juk8wG1w95vF5HK42SvvvTBhmGcmjphTSU2amlHfcgemfQ_8s19UeibTTwkr_4iOlcEYDZsEcgX6TZ9vi6FeaCYpTwx38F_fqzeTG-Vu8qcdgjLq32Lo6oiwj0f81X75trYVIw6VURTkYcwNe4Pk_j_HxluE-dSD-TtCKO7bQP5HRdhZ8/w1684-h1069-p-k-no-nu/1000186620.png"
-        
-        $msgText = "⚡ [ RDP CYBERPUNK READY ] ⚡`n`n🖥️ IP RDP: $tsIp`n👤 User: $rdpUser`n🔑 Password: $rdpPass`n`nSilakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!"
-        
-        $body = @{
+          Set-ItemProperty -Path $personalize `
+            -Name SystemUsesLightTheme -Value 0 -Type DWord
+
+          Write-Host "Konfigurasi dark mode selesai."
+
+      - name: Membuat Akun RDP
+        shell: pwsh
+        env:
+          RDP_USER: ${{ inputs.input_user }}
+          RDP_PASS: ${{ inputs.input_password }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          Write-Output "::add-mask::$env:RDP_PASS"
+
+          $securePassword = ConvertTo-SecureString `
+            $env:RDP_PASS -AsPlainText -Force
+
+          $existingUser = Get-LocalUser `
+            -Name $env:RDP_USER -ErrorAction SilentlyContinue
+
+          if ($existingUser) {
+            Set-LocalUser -Name $env:RDP_USER `
+              -Password $securePassword
+            Enable-LocalUser -Name $env:RDP_USER
+          }
+          else {
+            New-LocalUser -Name $env:RDP_USER `
+              -Password $securePassword `
+              -PasswordNeverExpires `
+              -AccountNeverExpires | Out-Null
+          }
+
+          Add-LocalGroupMember `
+            -Group "Administrators" `
+            -Member $env:RDP_USER `
+            -ErrorAction SilentlyContinue
+
+          Write-Host "Akun Windows berhasil dikonfigurasi."
+
+      - name: Unduh Foto Profil dan Wallpaper
+        shell: pwsh
+        env:
+          RDP_USER: ${{ inputs.input_user }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $avatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjFqQRxOHnZXYINO_52beLKrfrMypBHzpnllWSHx6gQHO4yspMqi2skpfp8z0lvsOOWHjSJ6G33I8Y2rGXo8_FVAkrgnDxtYuWK_Z5go81NcvEoRV6koacWRU4HsXD0R3nqW69a1FJnxhzy2PI8z2PQKqxWIEc_mX3oOROBIj9Y3HW4NcEq6FcNzMyMMwA/s1600/1000184069.jpg"
+
+          $wallpaperUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgRFqAvUV6j9-n3L65cySSsdK3JHZ88fKJlquXCK5pGhNRRlOmYfnIb3Zk4Y7SUC232-P5VcYgFZgiJ7jPfTR4HUmKtiOLG60FzYgby4m52MHOgXB0JuV5KZaR_3tdOPH5USQOqBx2GHYj_KTnntxjNzKKIh0VPFLAOaNoBlVJZi13KPvoWgjRRseVZObA/s1600/1000184023.jpg"
+
+          $avatarFile = "C:\ProgramData\Arianto\avatar.jpg"
+          $wallpaperFile = "C:\ProgramData\Arianto\wallpaper.jpg"
+
+          New-Item -ItemType Directory `
+            -Path "C:\ProgramData\Arianto" `
+            -Force | Out-Null
+
+          $wc = New-Object System.Net.WebClient
+          $wc.Headers.Add("User-Agent", "Mozilla/5.0")
+
+          try {
+            $wc.DownloadFile($avatarUrl, $avatarFile)
+
+            if ((Get-Item $avatarFile).Length -lt 1000) {
+              throw "File avatar terlalu kecil."
+            }
+
+            $profilePath = "C:\ProgramData\Microsoft\User Account Pictures"
+
+            New-Item -ItemType Directory `
+              -Path $profilePath -Force | Out-Null
+
+            Copy-Item $avatarFile `
+              "$profilePath\default.jpg" -Force
+
+            Write-Host "Foto profil berhasil diunduh."
+          }
+          catch {
+            Write-Warning "Foto profil gagal diproses: $($_.Exception.Message)"
+          }
+
+          try {
+            $wc.DownloadFile($wallpaperUrl, $wallpaperFile)
+
+            if ((Get-Item $wallpaperFile).Length -lt 1000) {
+              throw "File wallpaper terlalu kecil."
+            }
+
+            # Mengatur wallpaper untuk sesi pengguna runner.
+            $wallpaperReg = "HKCU:\Control Panel\Desktop"
+
+            Set-ItemProperty -Path $wallpaperReg `
+              -Name Wallpaper -Value $wallpaperFile
+
+            Add-Type @"
+          using System.Runtime.InteropServices;
+          public class AriantoWallpaper {
+            [DllImport("user32.dll", SetLastError=true)]
+            public static extern bool SystemParametersInfo(
+              int action, int param, string path, int flags
+            );
+          }
+          "@
+
+            [AriantoWallpaper]::SystemParametersInfo(
+              20, 0, $wallpaperFile, 3
+            ) | Out-Null
+
+            Write-Host "Wallpaper berhasil diunduh dan diterapkan ke sesi runner."
+            Write-Host "Catatan: sesi RDP pengguna dapat memiliki profil wallpaper berbeda."
+          }
+          catch {
+            Write-Warning "Wallpaper gagal diproses: $($_.Exception.Message)"
+          }
+
+      - name: Buat Informasi Pemilik di Desktop
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $desktopPath = "C:\Users\Public\Desktop"
+
+          New-Item -ItemType Directory `
+            -Path $desktopPath -Force | Out-Null
+
+          $msgContent = @"
+          ======================================
+                    MILIK ARIANTO
+          ======================================
+
+          Desktop Windows RDP
+          Terima kasih sudah menggunakan layanan ini.
+          Semoga lancar rezeki dan selalu sehat.
+
+          ======================================
+          @Arianto 2026
+          Lumajang - Candipuro
+          ======================================
+          "@
+
+          Set-Content `
+            -Path "$desktopPath\INFORMASI_PEMILIK_VPS.txt" `
+            -Value $msgContent -Encoding UTF8
+
+          Write-Host "Informasi pemilik dibuat."
+
+      - name: Instalasi dan Koneksi Tailscale
+        shell: pwsh
+        env:
+          TAILSCALE_KEY: ${{ inputs.tailscale_key }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          Write-Output "::add-mask::$env:TAILSCALE_KEY"
+
+          $installer = "$env:TEMP\tailscale-setup.msi"
+
+          Invoke-WebRequest `
+            -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.88.4-amd64.msi" `
+            -OutFile $installer `
+            -TimeoutSec 60
+
+          $install = Start-Process msiexec.exe `
+            -ArgumentList "/i `"$installer`" /quiet /norestart" `
+            -Wait -PassThru
+
+          if ($install.ExitCode -notin @(0, 3010)) {
+            throw "Instalasi Tailscale gagal."
+          }
+
+          $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
+
+          if (-not (Test-Path $tailscalePath)) {
+            throw "Executable Tailscale tidak ditemukan."
+          }
+
+          & $tailscalePath up `
+            "--authkey=$env:TAILSCALE_KEY" `
+            --accept-routes
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Koneksi Tailscale gagal."
+          }
+
+          Start-Sleep -Seconds 8
+
+          $tsIp = (& $tailscalePath ip -4 |
+            Select-Object -First 1).Trim()
+
+          if (-not $tsIp) {
+            throw "IP Tailscale tidak ditemukan."
+          }
+
+          "TAILSCALE_IP=$tsIp" >> $env:GITHUB_ENV
+
+          Write-Host "===================================="
+          Write-Host "IP TAILSCALE: $tsIp"
+          Write-Host "===================================="
+
+      - name: Aktifkan Fitur Remote Desktop
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          Set-ItemProperty `
+            -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
+            -Name fDenyTSConnections -Value 0
+
+          Set-ItemProperty `
+            -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" `
+            -Name UserAuthentication -Value 1
+
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+          Set-Service -Name TermService -StartupType Automatic
+          Start-Service -Name TermService
+
+          Write-Host "Konfigurasi Remote Desktop selesai."
+
+      - name: Kirim Gambar dan Informasi RDP ke Telegram
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: "1908469040"
+          RDP_USER: ${{ inputs.input_user }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if ([string]::IsNullOrWhiteSpace($env:BOT_TOKEN)) {
+            throw "GitHub Secret BOT_TOKEN belum dikonfigurasi."
+          }
+
+          Write-Output "::add-mask::$env:BOT_TOKEN"
+
+          $photoUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgRFqAvUV6j9-n3L65cySSsdK3JHZ88fKJlquXCK5pGhNRRlOmYfnIb3Zk4Y7SUC232-P5VcYgFZgiJ7jPfTR4HUmKtiOLG60FzYgby4m52MHOgXB0JuV5KZaR_3tdOPH5USQOqBx2GHYj_KTnntxjNzKKIh0VPFLAOaNoBlVJZi13KPvoWgjRRseVZObA/s1600/1000184023.jpg"
+
+          $tsIp = $env:TAILSCALE_IP
+
+          if (-not $tsIp) {
+            $tsIp = "IP belum tersedia"
+          }
+
+          $caption = @"
+          ⚡ ARIANTO RDP CYBERPUNK ⚡
+
+          🖥️ Sistem: Windows RDP
+          🌐 IP Tailscale: $tsIp
+          👤 Username: $env:RDP_USER
+          🔐 Password: tidak disertakan demi keamanan
+
+          📡 VPN: Tailscale
+          📌 Status: Workflow berjalan
+
+          © @Arianto 2026
+          Lumajang - Candipuro
+          "@
+
+          $payload = @{
             chat_id = $env:CHAT_ID
-            photo = $cyberImageUrl
-            caption = $msgText
-            parse_mode = "HTML"
-        } | ConvertTo-Json
-        
-        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendPhoto";
-        
-        try {
-            Invoke-RestMethod -Uri $uri -Method Post -ContentType "application/json" -Body $body;
-            Write-Host "Status: Informasi RDP beserta gambar berhasil dikirim ke Telegram Anda!";
-        } catch {
-            Write-Host "Peringatan: Gagal mengirim pesan ke Telegram: $_";
-        }
+            photo = $photoUrl
+            caption = $caption.Trim()
+          }
 
-    - name: Mengaktifkan Fitur Remote Desktop (RDP)
-      shell: pwsh
-      run: |
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Write-Host "Status: RDP Service aktif."
+          try {
+            $result = Invoke-RestMethod `
+              -Uri "https://api.telegram.org/bot$env:BOT_TOKEN/sendPhoto" `
+              -Method Post `
+              -Body $payload `
+              -TimeoutSec 30
 
-    - name: Menjaga Workflow Tetap Aktif
-      shell: pwsh
-      run: |
-        Write-Host "VPS RDP Cyberpunk berhasil diaktifkan!"
-        while ($true) {
+            if (-not $result.ok) {
+              throw "Telegram tidak mengonfirmasi pengiriman."
+            }
+
+            Write-Host "Gambar dan informasi berhasil dikirim ke Telegram."
+          }
+          catch {
+            Write-Host "Pengiriman Telegram gagal: $($_.Exception.Message)"
+            throw
+          }
+
+      - name: Menjaga Workflow Tetap Aktif
+        shell: pwsh
+        run: |
+          Write-Host "Workflow Cyberpunk sedang berjalan."
+
+          while ($true) {
             Start-Sleep -Seconds 30
-        }
+            Write-Host "Status: workflow masih aktif."
+          }
