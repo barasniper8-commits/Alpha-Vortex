@@ -5,14 +5,16 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 // URL Gambar Tema Cyberpunk Pro
 const CYBER_IMAGE_URL = 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800';
 
-// Pesan Sambutan Cyberpunk Pro
-const cyberpunkWelcome = `
+// Function Dinamis untuk Membuat Pesan Sambutan Cyberpunk (Menggunakan ctx)
+function getWelcomeMessage(ctx) {
+  const userName = ctx.from && ctx.from.first_name ? ctx.from.first_name : 'Agent';
+  return `
 ╔════════════════════╗
   ⚡ <b>ARIRDP RDP CONTROL CENTER</b> ⚡
 ╚════════════════════╝
 📡 <code>STATUS: ONLINE // LATENCY: 0ms</code> 🌐
 
-Welcome Agent <b>${ctx.from.first_name}</b> 🕵️‍♂️!
+Welcome Agent <b>${userName}</b> 🕵️‍♂️!
 
 🎮 <b>PANEL INSTRUKSI RDP:</b>
 1️⃣ 🚀 Jalankan Workflow <b>Windows RDP Cyberpunk</b>
@@ -25,7 +27,7 @@ Welcome Agent <b>${ctx.from.first_name}</b> 🕵️‍♂️!
 🔑 <b>Passcode</b>   | ℹ️ <b>System Info</b>| 🤖 <b>Bot Status</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
-
+}
 
 // 6 Tombol Menu Cyberpunk
 const cyberpunkKeyboard = Markup.inlineKeyboard([
@@ -40,30 +42,30 @@ bot.start(async (ctx) => {
     await ctx.replyWithPhoto(
       { url: CYBER_IMAGE_URL },
       {
-        caption: cyberpunkWelcome,
+        caption: getWelcomeMessage(ctx),
         parse_mode: 'HTML',
         ...cyberpunkKeyboard
       }
     );
   } catch (err) {
-    console.error(err);
+    console.error('Error saat /start:', err);
     ctx.reply('⚡ System Error: Gagal memuat interface cyberpunk.');
   }
 });
 
-// Handler saat mengirim pesan APAPUN
+// Handler saat mengirim pesan teks APAPUN
 bot.on('text', async (ctx) => {
   try {
     await ctx.replyWithPhoto(
       { url: CYBER_IMAGE_URL },
       {
-        caption: `⚡ <b>[ TERMINAL COMMAND RECEIVED ]</b>\n${cyberpunkWelcome}`,
+        caption: `⚡ <b>[ TERMINAL COMMAND RECEIVED ]</b>\n${getWelcomeMessage(ctx)}`,
         parse_mode: 'HTML',
         ...cyberpunkKeyboard
       }
     );
   } catch (err) {
-    console.error(err);
+    console.error('Error saat respon teks:', err);
   }
 });
 
