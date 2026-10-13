@@ -189,17 +189,14 @@ jobs:
       shell: pwsh
       run: |
         $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
-        
         Start-Sleep -Seconds 10
-        $rawIp = &$tailscalePath ip -4
-        $tsIp = ($rawIp | Select-Object -First 1).Trim()
         
-        if (-not $tsIp) {$tsIp = "Gagal Mendapatkan IP (Cek Tailscale Console)"
-        }
+        $tsIp = (&$tailscalePath ip -4 | Select-Object -First 1).Trim()
+        if (-not $tsIp) {$tsIp = "Cek Console Tailscale" }
         
-        $u = $env:RDP_USER$p = $env:RDP_PASS$msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* $tsIp`n👤 *User:* $u`n🔑 *Password:* $p`n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
+        $rdpUser = $env:RDP_USER$rdpPass = $env:RDP_PASS$msgText = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* $tsIp`n👤 *User:* $rdpUser`n🔑 *Password:* $rdpPass`n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
+        $encodedMsg = [System.Web.HttpUtility]::UrlEncode($msgText)
         
-        $encodedMsg = [uri]::EscapeDataString($msg)
         $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$encodedMsg&parse_mode=Markdown"
         
         try {
