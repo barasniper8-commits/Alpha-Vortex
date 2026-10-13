@@ -1,210 +1,106 @@
-name: Windows RDP Cyberpunk
+const { Telegraf, Markup } = require('telegraf');
 
-on:
-  workflow_dispatch:
-    inputs:
-      pass_code:
-        description: 'Masukkan Pass Kode (salah satu dari web)'
-        required: true
-        type: string
-      input_user:
-        description: 'Masukkan Username RDP (salah satu dari web)'
-        required: true
-        type: string
-      input_password:
-        description: 'Masukkan Password RDP (sesuai user)'
-        required: true
-        type: string
-      tailscale_key:
-        description: 'Masukkan Tailscale Auth Key'
-        required: true
-        type: string
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
-jobs:
-  build:
-    runs-on: windows-latest
-    timeout-minutes: 150
+// URL Gambar Tema Cyberpunk Pro
+const CYBER_IMAGE_URL = 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800';
 
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+// Pesan Sambutan Cyberpunk Pro
+const cyberpunkWelcome = `
+⚡ <b>[ SYSTEM INITIALIZED: CYBERNETIC_CORE ]</b> ⚡
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+ACCESS GRANTED // PROTOCOL: SECURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    - name: Membaca & Memvalidasi
-      id: fetch-cred
-      shell: pwsh
-      run: |
-        $u1 = "https://arianto1"
-        $u2 = "2.lynk.id/p/ganjay"
-        $targetUrl = "$u1$u2"
-        
-        [Console]::WriteLine("::add-mask::$targetUrl")
-        
-        try {
-            $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
-            $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
-            $webContent = $response.Content
-            
-            $plainText = [System.Text.RegularExpressions.Regex]::Replace($webContent, "<[^>]+>", " ")
-            
-            $validPassCodes = @()
-            $validUsers = @()
-            $validPasswords = @()
+🤖 <b>RDP & AUTOMATION CONTROL INTERFACE</b>
+Selamat datang di terminal utama sistem. Silakan pilih menu navigasi di bawah untuk mengakses layanan:
 
-            if ($plainText -match "passcode\s*[:=]\s*([^\r\n]+)") {
-                $validPassCodes = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
-            }
-            if ($plainText -match "user\s*[:=]\s*([^\r\n]+)") {
-                $validUsers = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
-            }
-            if ($plainText -match "password\s*[:=]\s*([^\r\n]+)") {
-                $validPasswords = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
-            }
+⚙️ <b>SYSTEM STATUS:</b> <code>ONLINE [CYBERPUNK PRO]</code>
+`;
 
-            if ($validPassCodes.Count -eq 0) { $validPassCodes = @($plainText -split '\s+') }
-            if ($validUsers.Count -eq 0) { $validUsers = @("${{ github.event.inputs.input_user }}") }
-            if ($validPasswords.Count -eq 0) { $validPasswords = @("${{ github.event.inputs.input_password }}") }
+// 6 Tombol Menu Cyberpunk
+const cyberpunkKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('🛡️ ADMIN', 'menu_admin'), Markup.button.callback('⚡ RDP FREE', 'menu_rdp_free')],
+  [Markup.button.callback('💎 RDP BUY', 'menu_rdp_buy'), Markup.button.callback('🔑 PASSKODE', 'menu_passkode')],
+  [Markup.button.callback('ℹ️ INFO', 'menu_info'), Markup.button.callback('🤖 BOT', 'menu_bot')]
+]);
 
-            Write-Output "web_paskodes=$($validPassCodes -join ',')" >> $env:GITHUB_OUTPUT
-            Write-Output "web_users=$($validUsers -join ',')" >> $env:GITHUB_OUTPUT
-            Write-Output "web_passwords=$($validPasswords -join ',')" >> $env:GITHUB_OUTPUT
-            
-            Write-Host "Status: Data dari Lynk.id berhasil diakses."
-        } catch {
-            Write-Host "Peringatan: Gagal membaca halaman web, melanjutkan proses dengan input pengguna."
-            Write-Output "web_paskodes=bypass" >> $env:GITHUB_OUTPUT
-            Write-Output "web_users=${{ github.event.inputs.input_user }}" >> $env:GITHUB_OUTPUT
-            Write-Output "web_passwords=${{ github.event.inputs.input_password }}" >> $env:GITHUB_OUTPUT
-        }
+// Handler Perintah /start
+bot.start(async (ctx) => {
+  try {
+    await ctx.replyWithPhoto(
+      { url: CYBER_IMAGE_URL },
+      {
+        caption: cyberpunkWelcome,
+        parse_mode: 'HTML',
+        ...cyberpunkKeyboard
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    ctx.reply('⚡ System Error: Gagal memuat interface cyberpunk.');
+  }
+});
 
-    - name: Konfigurasi Tampilan 
-      shell: pwsh
-      run: |
-        Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -Value 0
-        Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'SystemUsesLightTheme' -Value 0
+// Handler saat mengirim pesan APAPUN
+bot.on('text', async (ctx) => {
+  try {
+    await ctx.replyWithPhoto(
+      { url: CYBER_IMAGE_URL },
+      {
+        caption: `⚡ <b>[ TERMINAL COMMAND RECEIVED ]</b>\n${cyberpunkWelcome}`,
+        parse_mode: 'HTML',
+        ...cyberpunkKeyboard
+      }
+    );
+  } catch (err) {
+    console.error(err);
+  }
+});
 
-    - name: Verifikasi & Pembuatan Akun RDP
-      shell: pwsh
-      run: |
-        $inputUser = "${{ github.event.inputs.input_user }}".Trim()
-        $inputPass = "${{ github.event.inputs.input_password }}".Trim()
-        
-        Write-Host "::add-mask::$inputPass"
+// Aksi Tombol 1: ADMIN
+bot.action('menu_admin', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.reply('🛡️ <b>ADMIN CONTACT:</b>\nSilakan hubungi admin utama melalui link berikut:\n🔗 https://t.me/Arianto2508', { parse_mode: 'HTML' });
+});
 
-        net user $inputUser $inputPass /add
-        net localgroup administrators $inputUser /add
-        Write-Host "Status: Akun RDP '$inputUser' berhasil dibuat dan berstatus Administrator."
+// Aksi Tombol 2: RDP FREE
+bot.action('menu_rdp_free', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.reply('⚡ <b>RDP FREE STATUS:</b>\nSlot server RDP gratis akan diperbarui secara berkala di channel info. Pastikan selalu memantau pembaruan sistem!', { parse_mode: 'HTML' });
+});
 
-    - name: Set tampilan
-      env:
-        RDP_USER: ${{ github.event.inputs.input_user }}
-      shell: pwsh
-      run: |
-        $avatarUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjFqQRxOHnZXYINO_52beLKrfrMypBHzpnllWSHx6gQHO4yspMqi2skpfp8z0lvsOOWHjSJ6G33I8Y2rGXo8_FVAkrgnDxtYuWK_Z5go81NcvEoRV6koacWRU4HsXD0R3nqW69a1FJnxhzy2PI8z2PQKqxWIEc_mX3oOROBIj9Y3HW4NcEq6FcNzMyMMwA/s1600/1000184069.jpg"
-        $avatarPath = "C:\ProgramData\Microsoft\User Account Pictures"
-        
-        try {
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0")
-            $wc.DownloadFile($avatarUrl, "C:\avatar.jpg")
-            
-            if (-not (Test-Path $avatarPath)) { New-Item -ItemType Directory -Force -Path $avatarPath }
-            
-            Copy-Item "C:\avatar.jpg" "$avatarPath\$env:RDP_USER.jpg" -Force
-            Copy-Item "C:\avatar.jpg" "$avatarPath\default.jpg" -Force
-            
-            $userSid = (New-Object System.Security.Principal.NTAccount($env:RDP_USER)).Translate([System.Security.Principal.SecurityIdentifier]).Value
-            $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AccountPicture\Users\$userSid"
-            if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-            
-            New-ItemProperty -Path $regPath -Name "Image448" -Value "C:\avatar.jpg" -PropertyType String -Force | Out-Null
-            New-ItemProperty -Path $regPath -Name "Image192" -Value "C:\avatar.jpg" -PropertyType String -Force | Out-Null
-            Write-Output "Foto profil JPG berhasil dipasang."
-        } catch {
-            Write-Output "Peringatan: Gagal mengunduh foto profil: $_"
-        }
+// Aksi Tombol 3: RDP BUY
+bot.action('menu_rdp_buy', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.reply('💎 <b>RDP BUY / PREMIUM:</b>\nDapatkan akses server RDP kecepatan tinggi bergaransi penuh melalui checkout resmi:', {
+    parse_mode: 'HTML',
+    ...Markup.inlineKeyboard([[Markup.button.url('🛒 Beli RDP via Lynk.id', 'https://lynk.id')]])
+  });
+});
 
-        $wallpaperUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgRFqAvUV6j9-n3L65cySSsdK3JHZ88fKJlquXCK5pGhNRRlOmYfnIb3Zk4Y7SUC232-P5VcYgFZgiJ7jPfTR4HUmKtiOLG60FzYgby4m52MHOgXB0JuV5KZaR_3tdOPH5USQOqBx2GHYj_KTnntxjNzKKIh0VPFLAOaNoBlVJZi13KPvoWgjRRseVZObA/s1600/1000184023.jpg"
-        try {
-            $wcW = New-Object System.Net.WebClient
-            $wcW.Headers.Add("User-Agent", "Mozilla/5.0")
-            $wcW.DownloadFile($wallpaperUrl, "C:\wallpaper.jpg")
-            
-            takeown /f "C:\Windows\Web\Wallpaper\Windows\img0.jpg"
-            icacls "C:\Windows\Web\Wallpaper\Windows\img0.jpg" /grant Administrators:F
-            Copy-Item "C:\wallpaper.jpg" "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Force
-            Write-Output "Wallpaper berhasil dipasang."
-        } catch {
-            Write-Output "Peringatan: Gagal mengunduh wallpaper, melewati bagian ini..."
-        }
+// Aksi Tombol 4: PASSKODE
+bot.action('menu_passkode', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.reply('🔑 <b>PASSKODE VERIFICATION:</b>\nMasukkan passkode SHA-256 atau verifikasi melalui halaman tautan resmi sistem.', { parse_mode: 'HTML' });
+});
 
-    - name: loading . . .
-      shell: pwsh
-      run: |
-        $desktopPath = [Environment]::GetFolderPath('CommonDesktopDirectory')
-        if (-not (Test-Path $desktopPath)) { $desktopPath = "C:\Users\Public\Desktop" }
-        
-        $msgContent = "======================================`nMILIK ARIANTO`n======================`nDesktop free terima kasih sudah beli token`ndan semoga lancar rezeki sehat selalu.`n======================`n@Arianto 2026 Lumajang Candipuro`n@WhatsApp 0831-2211-6267"
-        
-        Set-Content -Path "$desktopPath\INFORMASI_PEMILIK_VPS.txt" -Value $msgContent -Encoding UTF8
-        Write-Output "File informasi teks berhasil dibuat di desktop."
+// Aksi Tombol 5: INFO
+bot.action('menu_info', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.reply('ℹ️ <b>SYSTEM INFORMATION:</b>\n• Core: Node.js / Telegraf\n• Tema: Cyberpunk Pro UI\n• Status: Secured & Active 24/7', { parse_mode: 'HTML' });
+});
 
-    - name: Instalasi & Koneksi Tailscale VPN (Windows MSI)
-      shell: pwsh
-      run: |
-        $installer = "$env:TEMP\tailscale-setup.msi"
-        Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.88.4-amd64.msi" -OutFile $installer
-        Start-Process msiexec.exe -Wait -ArgumentList "/i $installer /quiet /norestart"
-        
-        $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
-        & $tailscalePath up --authkey="${{ github.event.inputs.tailscale_key }}" --accept-routes
-        
-        Start-Sleep -Seconds 5
-        $tsIp = &$tailscalePath ip -4
-        Write-Host "=========================================="
-        Write-Host "IP TAILSCALE VPS ANDA: $tsIp" -ForegroundColor Cyan
-        Write-Host "=========================================="
+// Aksi Tombol 6: BOT
+bot.action('menu_bot', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.reply('🤖 <b>BOT SPECIFICATION:</b>\nBot otomatisasi manajemen RDP, panel kontrol, dan integrasi sistem cerdas berbasis cloud.', { parse_mode: 'HTML' });
+});
 
-    - name: Kirim Informasi RDP ke Telegram Bot
-      env:
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        CHAT_ID: "1908469040"
-        RDP_USER: ${{ github.event.inputs.input_user }}
-        RDP_PASS: ${{ github.event.inputs.input_password }}
-      shell: pwsh
-      run: |
-        $tailscalePath = "${env:ProgramFiles}\Tailscale\tailscale.exe"
-        
-        Start-Sleep -Seconds 10
-        $tsIp = (&$tailscalePath ip -4).Trim()
-        
-        if (-not $tsIp) {$tsIp = "Gagal Mendapatkan IP (Cek Tailscale Console)"
-        }
-        
-        $msg = "⚡ *[ RDP CYBERPUNK READY ]* ⚡`n`n🖥️ *IP RDP:* $tsIp`n👤 *User:* $env:RDP_USER`n🔑 *Password:* $env:RDP_PASS`n`n_Silakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!_"
-        
-        $encodedMsg = [uri]::EscapeDataString($msg)
-        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendMessage?chat_id=$env:CHAT_ID&text=$encodedMsg&parse_mode=Markdown"
-        
-        try {
-            Invoke-RestMethod -Uri $uri -Method Get
-            Write-Host "Status: Informasi RDP berhasil dikirim ke Telegram Anda!"
-        } catch {
-            Write-Host "Peringatan: Gagal mengirim pesan ke Telegram: $_"
-        }
+// Jalankan Bot
+bot.launch().then(() => {
+  console.log('🤖 Cyberpunk Bot berhasil berjalan!');
+});
 
-    - name: Mengaktifkan Fitur Remote Desktop (RDP)
-      shell: pwsh
-      run: |
-        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Write-Host "Status: RDP Service aktif & Passcode terverifikasi."
-
-    - name: Menjaga Workflow Tetap Aktif
-      shell: pwsh
-      run: |
-        Write-Host "VPS RDP Cyberpunk berhasil diaktifkan dan terhubung ke jaringan Tailscale!"
-        while ($true) {
-            Start-Sleep -Seconds 30
-        }
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
