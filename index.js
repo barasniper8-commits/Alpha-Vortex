@@ -9,9 +9,7 @@ const CYBER_IMAGE_URL = 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AV
 function getWelcomeMessage(ctx) {
   const userName = ctx.from && ctx.from.first_name ? ctx.from.first_name : 'Agent';
   return `
-
 WELCOME AGENT <b>${userName}</b> 🕵️‍♂️!
-
 ━━━━━━━━━━━━━━━━━━━━━━
 🎮 <b>PANEL INSTRUKSI RDP:</b>
 1️⃣ 🚀 Jalankan Workflow <b>Windows RDP Cyberpunk</b>
