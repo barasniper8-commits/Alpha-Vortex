@@ -77,7 +77,7 @@ Tailscale key : ( autkey )
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [Markup.button.url('🔑 AMBIL PASSCODE', 'https://arianto12.lynk.id/p/linsensi-key')],
-          [Markup.button.url('🐙 GITHUB REPO', 'https://github.com')]
+          [Markup.button.url('🐙 GITHUB REPO', 'https://github.com/barasniper8-commits/Alpha-Vortex')]
         ])
       }
     );
