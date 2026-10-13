@@ -8,9 +8,9 @@ const CYBER_IMAGE_URL = 'https://images.unsplash.com/photo-1607604276583-eef5d07
 // Pesan Sambutan Cyberpunk Pro
 const cyberpunkWelcome = `
 ⚡ <b>[ SYSTEM INITIALIZED: CYBERNETIC_CORE ]</b> ⚡
-━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
 ACCESS GRANTED // PROTOCOL: TAILSCALE_RDP
-━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━
 
 🤖 <b>RDP & AUTOMATION CONTROL INTERFACE</b>
 Selamat datang di terminal utama sistem RDP Cyberpunk.
