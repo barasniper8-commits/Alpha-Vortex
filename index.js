@@ -7,21 +7,25 @@ const CYBER_IMAGE_URL = 'https://images.unsplash.com/photo-1607604276583-eef5d07
 
 // Pesan Sambutan Cyberpunk Pro
 const cyberpunkWelcome = `
-⚡ <b>[ SYSTEM INITIALIZED: CYBERNETIC_CORE ]</b> ⚡
-━━━━━━━━━━━━━━━━━━━
-ACCESS GRANTED // PROTOCOL: TAILSCALE_RDP
-━━━━━━━━━━━━━━━━━━━
+╔════════════════════╗
+  ⚡ <b>ARIRDP RDP CONTROL CENTER</b> ⚡
+╚════════════════════╝
+📡 <code>STATUS: ONLINE // LATENCY: 0ms</code> 🌐
 
-🤖 <b>RDP & AUTOMATION CONTROL INTERFACE</b>
-Selamat datang di terminal utama sistem RDP Cyberpunk.
+Welcome Agent <b>${ctx.from.first_name}</b> 🕵️‍♂️!
 
-🖥️ <b>CARA MENDAPATKAN KONEKSI RDP:</b>
-1. Jalankan workflow <b>Windows RDP Cyberpunk</b> di GitHub Actions.
-2. Masukkan input Username, Password, & Auth Key Tailscale.
-3. Begitu VPS aktif, bot akan <b>otomatis mengabari IP RDP Anda di sini</b>!
+🎮 <b>PANEL INSTRUKSI RDP:</b>
+1️⃣ 🚀 Jalankan Workflow <b>Windows RDP Cyberpunk</b>
+2️⃣ 🔐 Masukkan Passcode, User, Pass & Auth Key
+3️⃣ 📥 IP & Akses RDP dikirim otomatis ke chat ini!
 
-⚙️ <b>SYSTEM STATUS:</b> <code>ONLINE [CYBERPUNK PRO]</code>
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 <b>MAIN COMMAND MENU</b> 🔥
+🛡️ <b>Admin Info</b> | ⚡ <b>Free RDP</b> | 💎 <b>Buy RDP</b>
+🔑 <b>Passcode</b>   | ℹ️ <b>System Info</b>| 🤖 <b>Bot Status</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
+
 
 // 6 Tombol Menu Cyberpunk
 const cyberpunkKeyboard = Markup.inlineKeyboard([
