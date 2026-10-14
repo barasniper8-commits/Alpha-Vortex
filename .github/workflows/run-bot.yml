@@ -4,22 +4,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-bot:
-    runs-on: ubuntu-latest
+    run-bot:
+      runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-    - name: Install Dependencies
-      run: npm install
+      - name: Install Dependencies
+        run: npm install
 
-    - name: Jalankan Bot Telegram
-      env:
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-      run: node index.js
+      - name: Jalankan Bot Telegram (Auto-Restart setiap 5 Menit / Saat Mati)
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          while true; do
+            echo "=== Menjalankan Bot Telegram ==="
+            # Bot berjalan maksimal 300 detik (5 menit) atau berhenti jika terjadi error/mati, lalu otomatis di-restart
+            timeout 300s node index.js || echo "Bot berhenti atau durasi 5 menit tercapai. Memulai ulang otomatis..."
+            sleep 3
+          done
