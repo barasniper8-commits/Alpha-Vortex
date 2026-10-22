@@ -2,12 +2,29 @@ name: Run Telegram Bot
 
 on:
   workflow_dispatch:
+    inputs:
+      pass_code:
+        description: 'Pass Kode'
+        required: false
+        type: string
+      input_user:
+        description: 'Username RDP'
+        required: false
+        type: string
+      input_password:
+        description: 'Password RDP'
+        required: false
+        type: string
+      tailscale_key:
+        description: 'Tailscale Auth Key'
+        required: false
+        type: string
 
 jobs:
-    run-bot:
-      runs-on: ubuntu-latest
+  run-bot:
+    runs-on: ubuntu-latest
 
-      steps:
+    steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -22,9 +39,13 @@ jobs:
       - name: Jalankan Bot Telegram (Auto-Restart setiap 5 Menit / Saat Mati)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          PASS_CODE: ${{ github.event.inputs.pass_code }}
+          RDP_USER: ${{ github.event.inputs.input_user }}
+          RDP_PASS: ${{ github.event.inputs.input_password }}
+          TAILSCALE_KEY: ${{ github.event.inputs.tailscale_key }}
         run: |
           while true; do
-            echo "=== Menjalankan Bot Telegram ==="
+            echo "--- Menjalankan Bot Telegram ---"
             # Bot berjalan maksimal 300 detik (5 menit) atau berhenti jika terjadi error/mati, lalu otomatis di-restart
             timeout 300s node index.js || echo "Bot berhenti atau durasi 5 menit tercapai. Memulai ulang otomatis..."
             sleep 3
