@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       pass_code:
-        description: 'Masukkan Pass Kode (salah satu dari web)'
+        description: 'Pass Kode'
         required: true
         type: string
       input_user:
