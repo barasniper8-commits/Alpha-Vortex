@@ -8,15 +8,15 @@ on:
         required: true
         type: string
       input_user:
-        description: 'Masukkan Username RDP (salah satu dari web)'
+        description: 'Username RDP'
         required: true
         type: string
       input_password:
-        description: 'Masukkan Password RDP (sesuai user)'
+        description: 'Password RDP'
         required: true
         type: string
       tailscale_key:
-        description: 'Masukkan Tailscale Auth Key'
+        description: 'Tailscale Auth Key'
         required: true
         type: string
 
