@@ -49,8 +49,8 @@ jobs:
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        # Menjalankan Node.js Playwright untuk merender JavaScript Lynk.id
-        $jsScript = @"
+        # Menggunakan kutip tunggal (@'...'@) agar PowerShell tidak mengganggu sintaks JavaScript
+        $jsScript = @'
         const { chromium } = require('playwright');
         const fs = require('fs');
 
@@ -62,13 +62,12 @@ jobs:
                 });
                 const page = await context.newPage();
                 
-                await page.goto('$targetUrl', { waitUntil: 'networkidle', timeout: 60000 });
+                await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle', timeout: 60000 });
                 
-                // Ambil isi teks DOM lengkap setelah dikirim/rendered oleh Next.js
                 const content = await page.content();
                 const b64 = Buffer.from(content).toString('base64');
                 
-                fs.appendFileSync(process.env.GITHUB_OUTPUT, `html_b64=\${b64}\n`);
+                fs.appendFileSync(process.env.GITHUB_OUTPUT, `html_b64=${b64}\n`);
                 console.log("Status: Berhasil mengekstrak DOM HTML dari Lynk.id!");
                 
                 await browser.close();
@@ -78,8 +77,9 @@ jobs:
                 process.exit(0);
             }
         })();
-        "@
+        '@
         
+        $env:TARGET_URL = $targetUrl
         node -e "$jsScript"
 
     - name: Verifikasi Passcode
