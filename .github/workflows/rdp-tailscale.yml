@@ -48,7 +48,8 @@ jobs:
             $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
             $htmlRaw = $response.Content
         } catch {
-            throw "Gagal terhubung ke Lynk.id: $_"
+            Write-Warning "Gagal terhubung ke Lynk.id: $_"
+            $htmlRaw = ""
         }
 
         $htmlDecoded = [System.Web.HttpUtility]::UrlDecode($htmlRaw)
