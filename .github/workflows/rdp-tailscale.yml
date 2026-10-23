@@ -23,7 +23,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 6
+    timeout-minutes: 360
 
     steps:
     - name: Checkout Repository
@@ -40,11 +40,11 @@ jobs:
         [Console]::WriteLine("::add-mask::$targetUrl")
         
         try {
-            $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
+            $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
             $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
             $rawContent = $response.Content
             
-            # Encode seluruh respons web ke Base64 agar aman diteruskan
+            # Encode seluruh respons web ke Base64 agar aman
             $bytes = [System.Text.Encoding]::UTF8.GetBytes($rawContent)
             $encodedContent = [Convert]::ToBase64String($bytes)
             
@@ -61,6 +61,8 @@ jobs:
         INPUT_PASSCODE: ${{ github.event.inputs.pass_code }}
       shell: pwsh
       run: |
+        Add-Type -AssemblyName System.Web
+
         $inputCode = $env:INPUT_PASSCODE.Trim()
         $b64 = $env:HTML_B64
 
@@ -73,12 +75,19 @@ jobs:
             exit 0
         }
 
-        # Decode seluruh halaman web
+        # Decode dari Base64
         $decodedBytes = [System.Convert]::FromBase64String($b64)
-        $htmlContent = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
+        $htmlRaw = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
-        # Cek apakah passcode input ada di dalam sumber kode HTML web
-        if ($htmlContent.Contains($inputCode)) {
+        # Normalisasi teks: URL Decode & HTML Decode untuk menangani karakter tersembunyi
+        $htmlDecoded = [System.Web.HttpUtility]::UrlDecode($htmlRaw)
+        $htmlDecoded = [System.Web.HttpUtility]::HtmlDecode($htmlDecoded)
+
+        # Hapus tanda hubung/strip jika ada perbedaan format unicode
+        $cleanInput = $inputCode -replace '[^a-zA-Z0-9]', ''
+        $cleanHtml  = $htmlDecoded -replace '[^a-zA-Z0-9]', ''
+
+        if ($htmlDecoded.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
             Write-Host "Status: Passcode '$inputCode' BERHASIL DITEMUKAN di halaman web!" -ForegroundColor Green
         } else {
             Write-Error "ERROR: Passcode '$inputCode' TIDAK DITEMUKAN di dalam sumber halaman web!"
