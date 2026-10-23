@@ -29,7 +29,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Membaca & Memvalidasi Web HTML via Proxy
+    - name: Membaca & Memvalidasi Web HTML Lynk.id
       id: fetch-cred
       shell: pwsh
       run: |
@@ -37,17 +37,13 @@ jobs:
         $u2 = "2.lynk.id/p/ganjay"
         $targetUrl = "$u1$u2"
         
-        # Menggunakan CodeTabs Proxy dengan URL terpisah
-        $proxyUrl = "https://api.codetabs.com/v1/proxy?url=" + [System.Web.HttpUtility]::UrlEncode($targetUrl)
-        
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
-        $response = Invoke-WebRequest -Uri $proxyUrl -Headers $headers -UseBasicParsing
-        $htmlContent = $response.Content
+        # Menggunakan curl.exe dengan Header Peramban Asli untuk melewati Cloudflare Lynk.id
+        $htmlContent = curl.exe -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" $targetUrl | Out-String
         
-        if (-not $htmlContent) {
-            throw "Gagal total: Konten HTML dari halaman Lynk.id kosong."
+        if ([string]::IsNullOrWhiteSpace($htmlContent)) {
+            throw "Gagal total: Tidak dapat membaca isi HTML dari Lynk.id."
         }
         
         $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlContent)
@@ -74,12 +70,14 @@ jobs:
         $decodedBytes = [System.Convert]::FromBase64String($b64)
         $htmlContent = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
+        # Cari passcode yang ada di dalam elemen hidden-data HTML Lynk.id
         $allowedCodes = @()
         if ($htmlContent -match "passcode\s*[:=]\s*([^<]+)") {
             $rawText = $Matches[1].Trim()
             $allowedCodes = $rawText -split ',' | ForEach-Object { $_.Trim() }
         }
 
+        # Cek kecocokan passcode
         $matchFound = $false
         foreach ($code in $allowedCodes) {
             if ($code -eq $inputCode) {
@@ -88,12 +86,13 @@ jobs:
             }
         }
 
+        # Cadangan pencarian di seluruh string HTML
         if (-not $matchFound -and $htmlContent.Contains($inputCode)) {
             $matchFound = $true
         }
 
         if ($matchFound) {
-            Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi di halaman Lynk.id!" -ForegroundColor Green
+            Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi di Lynk.id!" -ForegroundColor Green
         } else {
             Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman Lynk.id!"
             exit 1
