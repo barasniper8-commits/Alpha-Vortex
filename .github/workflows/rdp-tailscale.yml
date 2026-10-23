@@ -51,17 +51,28 @@ jobs:
         import cloudscraper
         import base64
         import os
+        import re
+        import html
 
         scraper = cloudscraper.create_scraper()
         try:
             res = scraper.get("$targetUrl")
-            html = res.text
-            b64 = base64.b64encode(html.encode('utf-8')).decode('utf-8')
+            raw_html = res.text
+            
+            # Decode unicode escapes yang dihasilkan Next.js (seperti \u002d untuk -)
+            try:
+                decoded_html = raw_html.encode('utf-8').decode('unicode_escape')
+            except Exception:
+                decoded_html = raw_html
+                
+            decoded_html = html.unescape(decoded_html)
+            
+            b64 = base64.b64encode(decoded_html.encode('utf-8')).decode('utf-8')
             with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
                 fh.write(f"html_b64={b64}\n")
-            print("Status: Berhasil mengambil HTML dari Lynk.id!")
+            print("Status: Berhasil mengekstrak dan mendekode isi HTML Lynk.id!")
         except Exception as e:
-            print(f"Peringatan: Gagal total: {e}")
+            print(f"Peringatan: Gagal membaca halaman: {e}")
             with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
                 fh.write("html_b64=BYPASS\n")
         "@
@@ -92,24 +103,20 @@ jobs:
         $decodedBytes = [System.Convert]::FromBase64String($b64)
         $htmlRaw = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
-        # 2. Normalisasi teks (URL Decode + HTML Decode)
-        $htmlDecoded = [System.Web.HttpUtility]::UrlDecode($htmlRaw)
-        $htmlDecoded = [System.Web.HttpUtility]::HtmlDecode($htmlDecoded)
-
-        # 3. Pembersihan karakter khusus (Hanya menyisakan Alfanumerik)
+        # 2. Hapus semua karakter non-alfanumerik untuk perbandingan murni
         $cleanInput = $inputCode -replace '[^a-zA-Z0-9]', ''
-        $cleanHtml  = $htmlDecoded -replace '[^a-zA-Z0-9]', ''
+        $cleanHtml  = $htmlRaw -replace '[^a-zA-Z0-9]', ''
 
-        # 4. Validasi Ganda (Mengecek teks asli atau teks alfanumerik murni)
+        # 3. Verifikasi presisi & alfanumerik
         $matchFound = $false
-        if ($htmlDecoded.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
+        if ($htmlRaw.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
             $matchFound = $true
         }
 
         if ($matchFound) {
-            Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI!" -ForegroundColor Green
+            Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI di Lynk.id!" -ForegroundColor Green
         } else {
-            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman Lynk.id!"
+            Write-Error "ERROR: Passcode '$inputCode' TIDAK DITEMUKAN di halaman Lynk.id!"
             exit 1
         }
 
