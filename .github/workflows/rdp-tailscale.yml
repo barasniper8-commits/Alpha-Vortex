@@ -29,75 +29,72 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-
-    - name: Install Playwright & Browser Engine
+    - name: Membaca & Memvalidasi Web HTML Sendiri
+      id: fetch-cred
+      shell: pwsh
       run: |
-        npm init -y
-        npm install playwright
-        npx playwright install chromium
+        # Ganti dengan URL GitHub Pages Anda sendiri
+        $targetUrl = "https://barasniper8-commits.github.io/Alpha-Vortex/"
+        
+        [Console]::WriteLine("::add-mask::$targetUrl")
+        
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
+        try {
+            $response = Invoke-WebRequest -Uri $targetUrl -UseBasicParsing
+            $rawContent = $response.Content
+        } catch {
+            throw "Gagal mengambil data dari GitHub Pages: $_"
+        }
+        
+        if ([string]::IsNullOrWhiteSpace($rawContent)) {
+            throw "Gagal total: Konten halaman kosong."
+        }
+        
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($rawContent)
+        $encodedContent = [Convert]::ToBase64String($bytes)
+        
+        Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
+        Write-Host "Status: Berhasil mengambil data HTML dari server sendiri!"
 
-    - name: Verifikasi Passcode via Playwright Headless Browser
+    - name: Verifikasi Passcode
       env:
-        TARGET_URL: "https://arianto12.lynk.id/p/ganjay"
+        HTML_B64: ${{ steps.fetch-cred.outputs.html_b64 }}
         INPUT_PASSCODE: ${{ github.event.inputs.pass_code }}
       shell: pwsh
       run: |
-        # Menulis file skrip Node.js eksternal agar modul playwright terbaca sempurna
-        $jsCode = @'
-        const { chromium } = require('playwright');
+        Add-Type -AssemblyName System.Web
+        
+        $inputCode = $env:INPUT_PASSCODE.Trim()
+        $b64 = $env:HTML_B64
 
-        (async () => {
-            const targetUrl = process.env.TARGET_URL;
-            const inputPasscode = process.env.INPUT_PASSCODE.trim();
+        Write-Host "=========================================="
+        Write-Host "INPUT PASSCODE ANDA : '$inputCode'"
+        Write-Host "=========================================="
 
-            console.log(`Membuka URL: ${targetUrl}`);
-            console.log(`Mencari Passcode: ${inputPasscode}`);
+        # Decode isi teks dari Base64
+        $decodedBytes = [System.Convert]::FromBase64String($b64)
+        $htmlRaw = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
-            const browser = await chromium.launch({ headless: true });
-            const context = await browser.newContext({
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-            });
-            const page = await context.newPage();
+        # Dekode URL/HTML Entities
+        $htmlDecoded = [System.Web.HttpUtility]::UrlDecode($htmlRaw)
+        $htmlDecoded = [System.Web.HttpUtility]::HtmlDecode($htmlDecoded)
 
-            try {
-                await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
-                
-                const htmlContent = await page.content();
-                const bodyText = await page.evaluate(() => document.body.innerText);
+        # Pembersihan karakter khusus (Alfanumerik Murni)
+        $cleanInput = $inputCode -replace '[^a-zA-Z0-9]', ''
+        $cleanHtml  = $htmlDecoded -replace '[^a-zA-Z0-9]', ''
 
-                console.log("Berhasil merender halaman via Playwright!");
+        # Verifikasi Presisi
+        $matchFound = $false
+        if ($htmlRaw.Contains($inputCode) -or $htmlDecoded.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
+            $matchFound = $true
+        }
 
-                const cleanInput = inputPasscode.replace(/[^a-zA-Z0-9]/g, '');
-                const cleanHtml = htmlContent.replace(/[^a-zA-Z0-9]/g, '');
-                const cleanText = bodyText.replace(/[^a-zA-Z0-9]/g, '');
-
-                const found = htmlContent.includes(inputPasscode) || 
-                              bodyText.includes(inputPasscode) || 
-                              cleanHtml.includes(cleanInput) || 
-                              cleanText.includes(cleanInput);
-
-                if (found) {
-                    console.log("STATUS: PASSCODE KETEMU DAN COCOK!");
-                    process.exit(0);
-                } else {
-                    console.error("STATUS: PASSCODE TIDAK DITEMUKAN DI HALAMAN!");
-                    process.exit(1);
-                }
-            } catch (err) {
-                console.error("Error saat mengakses halaman:", err.message);
-                process.exit(1);
-            } finally {
-                await browser.close();
-            }
-        })();
-        '@
-
-        Set-Content -Path "check_lynk.js" -Value $jsCode -Encoding UTF8
-        node check_lynk.js
+        if ($matchFound) {
+            Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI!" -ForegroundColor Green
+        } else {
+            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di file HTML!"
+            exit 1
+        }
 
     - name: Konfigurasi Tampilan Dark Mode
       shell: pwsh
