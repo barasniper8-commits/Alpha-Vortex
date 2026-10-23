@@ -29,7 +29,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Membaca & Memvalidasi Web Lynk.id via Reader API
+    - name: Membaca & Memvalidasi Web Lynk.id
       id: fetch-cred
       shell: pwsh
       run: |
@@ -39,25 +39,29 @@ jobs:
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        # Menggunakan Jina Reader API untuk bypass Cloudflare & JavaScript Lynk.id secara instan
-        $readerUrl = "https://r.jina.ai/$targetUrl"
+        # Mengunduh halaman dengan header lengkap peramban asli
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
+        $headers = @{
+            "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            "Accept"     = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
         
         try {
-            $response = Invoke-WebRequest -Uri $readerUrl -UseBasicParsing -Headers @{ "Accept" = "text/plain" }
-            $htmlContent = $response.Content
+            $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
+            $rawContent = $response.Content
         } catch {
-            throw "Gagal mengambil data dari Lynk.id via Reader API: $_"
+            $rawContent = curl.exe -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" $targetUrl | Out-String
         }
         
-        if ([string]::IsNullOrWhiteSpace($htmlContent)) {
-            throw "Gagal total: Konten dari Lynk.id kosong."
+        if ([string]::IsNullOrWhiteSpace($rawContent)) {
+            throw "Gagal total: Konten dari Lynk.id tidak dapat dimuat."
         }
         
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlContent)
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($rawContent)
         $encodedContent = [Convert]::ToBase64String($bytes)
         
         Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
-        Write-Host "Status: Berhasil membaca halaman Lynk.id!"
+        Write-Host "Status: Berhasil mengambil data dari halaman Lynk.id!"
 
     - name: Verifikasi Passcode
       env:
@@ -78,18 +82,22 @@ jobs:
         $decodedBytes = [System.Convert]::FromBase64String($b64)
         $htmlRaw = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
+        # Dekode URL/HTML Entities yang dihasilkan oleh platform Lynk.id
+        $htmlDecoded = [System.Web.HttpUtility]::UrlDecode($htmlRaw)
+        $htmlDecoded = [System.Web.HttpUtility]::HtmlDecode($htmlDecoded)
+
         # Pembersihan karakter khusus (Alfanumerik Murni)
         $cleanInput = $inputCode -replace '[^a-zA-Z0-9]', ''
-        $cleanHtml  = $htmlRaw -replace '[^a-zA-Z0-9]', ''
+        $cleanHtml  = $htmlDecoded -replace '[^a-zA-Z0-9]', ''
 
         # Verifikasi Presisi
         $matchFound = $false
-        if ($htmlRaw.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
+        if ($htmlRaw.Contains($inputCode) -or $htmlDecoded.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
             $matchFound = $true
         }
 
         if ($matchFound) {
-            Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI di Lynk.id!" -ForegroundColor Green
+            Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI di halaman Lynk.id!" -ForegroundColor Green
         } else {
             Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman Lynk.id!"
             exit 1
