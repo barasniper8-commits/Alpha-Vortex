@@ -34,9 +34,10 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Install Playwright & Browser Engine
+    - name: Install Playwright & Browser Engine Locally
       run: |
-        npm install -g playwright
+        npm init -y
+        npm install playwright
         npx playwright install chromium
 
     - name: Membaca & Memvalidasi Web HTML Lynk.id via Headless Browser
@@ -49,7 +50,6 @@ jobs:
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        # Menggunakan kutip tunggal (@'...'@) agar PowerShell tidak mengganggu sintaks JavaScript
         $jsScript = @'
         const { chromium } = require('playwright');
         const fs = require('fs');
