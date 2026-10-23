@@ -29,79 +29,75 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Membaca & Memvalidasi Web Lynk.id
-      id: fetch-cred
-      shell: pwsh
-      run: |
-        $u1 = "https://arianto1"
-        $u2 = "2.lynk.id/p/ganjay"
-        $targetUrl = "$u1$u2"
-        
-        [Console]::WriteLine("::add-mask::$targetUrl")
-        
-        # Mengunduh halaman dengan header lengkap peramban asli
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
-        $headers = @{
-            "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-            "Accept"     = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        }
-        
-        try {
-            $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
-            $rawContent = $response.Content
-        } catch {
-            $rawContent = curl.exe -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" $targetUrl | Out-String
-        }
-        
-        if ([string]::IsNullOrWhiteSpace($rawContent)) {
-            throw "Gagal total: Konten dari Lynk.id tidak dapat dimuat."
-        }
-        
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($rawContent)
-        $encodedContent = [Convert]::ToBase64String($bytes)
-        
-        Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
-        Write-Host "Status: Berhasil mengambil data dari halaman Lynk.id!"
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
 
-    - name: Verifikasi Passcode
+    - name: Install Playwright & Browser Engine
+      run: |
+        npm init -y
+        npm install playwright
+        npx playwright install chromium
+
+    - name: Verifikasi Passcode via Playwright Headless Browser
       env:
-        HTML_B64: ${{ steps.fetch-cred.outputs.html_b64 }}
+        TARGET_URL: "https://arianto12.lynk.id/p/ganjay"
         INPUT_PASSCODE: ${{ github.event.inputs.pass_code }}
       shell: pwsh
       run: |
-        Add-Type -AssemblyName System.Web
-        
-        $inputCode = $env:INPUT_PASSCODE.Trim()
-        $b64 = $env:HTML_B64
+        # Menulis file skrip Node.js eksternal agar modul playwright terbaca sempurna
+        $jsCode = @'
+        const { chromium } = require('playwright');
 
-        Write-Host "=========================================="
-        Write-Host "INPUT PASSCODE ANDA : '$inputCode'"
-        Write-Host "=========================================="
+        (async () => {
+            const targetUrl = process.env.TARGET_URL;
+            const inputPasscode = process.env.INPUT_PASSCODE.trim();
 
-        # Decode isi teks dari Base64
-        $decodedBytes = [System.Convert]::FromBase64String($b64)
-        $htmlRaw = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
+            console.log(`Membuka URL: ${targetUrl}`);
+            console.log(`Mencari Passcode: ${inputPasscode}`);
 
-        # Dekode URL/HTML Entities yang dihasilkan oleh platform Lynk.id
-        $htmlDecoded = [System.Web.HttpUtility]::UrlDecode($htmlRaw)
-        $htmlDecoded = [System.Web.HttpUtility]::HtmlDecode($htmlDecoded)
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            });
+            const page = await context.newPage();
 
-        # Pembersihan karakter khusus (Alfanumerik Murni)
-        $cleanInput = $inputCode -replace '[^a-zA-Z0-9]', ''
-        $cleanHtml  = $htmlDecoded -replace '[^a-zA-Z0-9]', ''
+            try {
+                await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
+                
+                const htmlContent = await page.content();
+                const bodyText = await page.evaluate(() => document.body.innerText);
 
-        # Verifikasi Presisi
-        $matchFound = $false
-        if ($htmlRaw.Contains($inputCode) -or $htmlDecoded.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
-            $matchFound = $true
-        }
+                console.log("Berhasil merender halaman via Playwright!");
 
-        if ($matchFound) {
-            Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI di halaman Lynk.id!" -ForegroundColor Green
-        } else {
-            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman Lynk.id!"
-            exit 1
-        }
+                const cleanInput = inputPasscode.replace(/[^a-zA-Z0-9]/g, '');
+                const cleanHtml = htmlContent.replace(/[^a-zA-Z0-9]/g, '');
+                const cleanText = bodyText.replace(/[^a-zA-Z0-9]/g, '');
+
+                const found = htmlContent.includes(inputPasscode) || 
+                              bodyText.includes(inputPasscode) || 
+                              cleanHtml.includes(cleanInput) || 
+                              cleanText.includes(cleanInput);
+
+                if (found) {
+                    console.log("STATUS: PASSCODE KETEMU DAN COCOK!");
+                    process.exit(0);
+                } else {
+                    console.error("STATUS: PASSCODE TIDAK DITEMUKAN DI HALAMAN!");
+                    process.exit(1);
+                }
+            } catch (err) {
+                console.error("Error saat mengakses halaman:", err.message);
+                process.exit(1);
+            } finally {
+                await browser.close();
+            }
+        })();
+        '@
+
+        Set-Content -Path "check_lynk.js" -Value $jsCode -Encoding UTF8
+        node check_lynk.js
 
     - name: Konfigurasi Tampilan Dark Mode
       shell: pwsh
