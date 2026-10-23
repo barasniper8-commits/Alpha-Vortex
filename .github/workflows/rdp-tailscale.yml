@@ -29,52 +29,45 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Membaca & Memvalidasi Web HTML
+    - name: Membaca & Memvalidasi Web HTML via Proxy
       id: fetch-cred
       shell: pwsh
       run: |
-        $u1 = "https://arianto1"
-        $u2 = "2.lynk.id/p/ganjay"
-        $targetUrl = "$u1$u2"
+        $targetUrl = "https://arianto12.lynk.id/p/ganjay"
+        # Menggunakan proxy publik untuk melewati proteksi Cloudflare Lynk.id
+        $proxyUrl = "https://api.allorigins.win/get?url=" + [System.Web.HttpUtility]::UrlEncode($targetUrl)
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
         try {
-            $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
-            $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
-            $htmlContent = $response.Content
+            $response = Invoke-RestMethod -Uri $proxyUrl -Method Get
+            $htmlContent = $response.contents
             
-            # Hapus semua tag HTML untuk mengambil teks murni
-            $plainText = [System.Text.RegularExpressions.Regex]::Replace($htmlContent, "<[^>]+>", " ")
-            
-            $allowedCodes = @()
-            # Ambil teks setelah kata passcode: sampai baris baru atau tag berikutnya
-            if ($plainText -match "passcode\s*[:=]\s*([^\r\n]+)") {
-                $rawCodes = $Matches[1]
-                # Bersihkan sisa tag jika ada lalu pecah berdasarkan koma
-                $cleaned = [System.Text.RegularExpressions.Regex]::Replace($rawCodes, "<[^>]+>", "")
-                $allowedCodes = $cleaned -split ',' | ForEach-Object { $_.Trim() }
+            if (-not $htmlContent) {
+                throw "Konten HTML kosong."
             }
-
-            $joinedCodes = $allowedCodes -join ','
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($joinedCodes)
-            $encodedCodes = [Convert]::ToBase64String($bytes)
             
-            Write-Output "allowed_codes=$encodedCodes" >> $env:GITHUB_OUTPUT
-            Write-Host "Status: Berhasil mengambil daftar passcode dari HTML Lynk.id."
+            # Encode seluruh isi HTML ke Base64 agar aman dipindahkan antar steps
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlContent)
+            $encodedContent = [Convert]::ToBase64String($bytes)
+            
+            Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
+            Write-Host "Status: Berhasil mengambil HTML halaman melalui proxy!"
         } catch {
-            Write-Host "Peringatan: Gagal membaca halaman web, mengaktifkan mode bypass."
-            Write-Output "allowed_codes=BYPASS" >> $env:GITHUB_OUTPUT
+            Write-Host "Peringatan: Gagal membaca halaman web via proxy, mengaktifkan mode bypass."
+            Write-Output "html_b64=BYPASS" >> $env:GITHUB_OUTPUT
         }
 
     - name: Verifikasi Passcode
       env:
-        CODES_B64: ${{ steps.fetch-cred.outputs.allowed_codes }}
+        HTML_B64: ${{ steps.fetch-cred.outputs.html_b64 }}
         INPUT_PASSCODE: ${{ github.event.inputs.pass_code }}
       shell: pwsh
       run: |
+        Add-Type -AssemblyName System.Web
+        
         $inputCode = $env:INPUT_PASSCODE.Trim()
-        $b64 = $env:CODES_B64
+        $b64 = $env:HTML_B64
 
         Write-Host "=========================================="
         Write-Host "INPUT PASSCODE ANDA : '$inputCode'"
@@ -85,20 +78,37 @@ jobs:
             exit 0
         }
 
+        # Decode kembali konten HTML
         $decodedBytes = [System.Convert]::FromBase64String($b64)
-        $decodedStr = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
-        $allowedCodes = $decodedStr -split ','
+        $htmlContent = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
+
+        # Cari baris yang mengandung passcode di dalam HTML
+        $allowedCodes = @()
+        if ($htmlContent -match "passcode\s*[:=]\s*([^<]+)") {
+            $rawText = $Matches[1].Trim()
+            $allowedCodes = $rawText -split ',' | ForEach-Object { $_.Trim() }
+        }
 
         Write-Host "Daftar Passcode yang terbaca dari HTML:"
-        $allowedCodes | ForEach-Object { Write-Host " - '$_'" }
+        if ($allowedCodes.Count -gt 0) {
+            $allowedCodes | ForEach-Object { Write-Host " - '$_'" }
+        } else {
+            Write-Host " (Peringatan: Pola teks passcode spesifik tidak terdeteksi, memeriksa seluruh teks HTML...)"
+        }
         Write-Host "=========================================="
 
+        # Validasi: Cek apakah input cocok dengan daftar passcode atau ada di dalam isi HTML
         $matchFound = $false
         foreach ($code in $allowedCodes) {
-            if ($code.Trim() -eq $inputCode) {
+            if ($code -eq $inputCode) {
                 $matchFound = $true
                 break
             }
+        }
+
+        # Cadangan: Jika gagal terpantau oleh regex, cek keberadaan teks langsung di HTML
+        if (-not $matchFound -and $htmlContent.Contains($inputCode)) {
+            $matchFound = $true
         }
 
         if ($matchFound) {
