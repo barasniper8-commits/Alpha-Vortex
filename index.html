@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>CYBERPUNK SECURE GATEWAY // TRANSPARENT</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #030307;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+        /* Background GIF dengan kontras tajam */
+        .bg-gif {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -4;
+            opacity: 0.4;
+            filter: contrast(140%) brightness(75%) saturate(120%);
+        }
+        /* Scanline Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%), linear-gradient(90deg, rgba(255, 0, 85, 0.03), rgba(0, 255, 204, 0.01), rgba(0, 85, 255, 0.03));
+            background-size: 100% 3px, 4px 100%;
+            z-index: -3;
+            pointer-events: none;
+        }
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+            z-index: -2;
+            pointer-events: none;
+        }
+        /* Huruf Melayang Tak Beraturan (A-Z) */
+        .matrix-rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .floating-char {
+            position: absolute;
+            color: rgba(0, 255, 204, 0.4);
+            font-weight: bold;
+            font-size: 18px;
+            user-select: none;
+            text-shadow: 0 0 8px rgba(0, 255, 204, 0.7);
+            animation: floatRandom linear infinite;
+        }
+        @keyframes floatRandom {
+            0% {
+                transform: translateY(110vh) translateX(0) rotate(0deg);
+                opacity: 0;
+            }
+            20% {
+                opacity: 0.9;
+            }
+            80% {
+                opacity: 0.9;
+            }
+            100% {
+                transform: translateY(-10vh) translateX(50px) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        /* Container Utama dengan Tampilan Transparan / Semi-Transparan (Glassmorphism) */
+        .cyber-container {
+            text-align: center;
+            z-index: 10;
+            padding: 45px 30px;
+            background: rgba(5, 5, 12, 0.35); /* Transparan */
+            border: 2px solid rgba(0, 255, 204, 0.7);
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.25), inset 0 0 15px rgba(0, 255, 204, 0.1);
+            border-radius: 8px;
+            backdrop-filter: blur(4px); /* Efek kaca buram transparan */
+            max-width: 420px;
+            width: 90%;
+            position: relative;
+            animation: borderGlow 3s infinite alternate;
+        }
+        @keyframes borderGlow {
+            0% { border-color: rgba(0, 255, 204, 0.7); box-shadow: 0 0 20px rgba(0, 255, 204, 0.25); }
+            50% { border-color: rgba(255, 0, 85, 0.7); box-shadow: 0 0 30px rgba(255, 0, 85, 0.35); }
+            100% { border-color: rgba(0, 255, 204, 0.7); box-shadow: 0 0 20px rgba(0, 255, 204, 0.25); }
+        }
+        /* Loading Bundar Besar Futuristis */
+        .loader-ring {
+            width: 130px;
+            height: 130px;
+            border: 4px solid rgba(0, 255, 204, 0.1);
+            border-top: 4px solid #00ffcc;
+            border-right: 4px solid #ff0055;
+            border-radius: 50%;
+            animation: spin 1.2s linear infinite;
+            margin: 0 auto 30px auto;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+            position: relative;
+        }
+        .loader-ring::after {
+            content: '';
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            border: 3px solid transparent;
+            border-bottom: 3px solid #00ffcc;
+            border-left: 3px solid #ff0055;
+            border-radius: 50%;
+            animation: spin-reverse 1.8s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes spin-reverse {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(-360deg); }
+        }
+        /* Efek Glitch pada Judul */
+        .glitch-title {
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #ffffff;
+            margin-bottom: 15px;
+            position: relative;
+            text-shadow: 0 0 10px #00ffcc;
+            animation: glitch-anim 2.5s infinite;
+        }
+        .glitch-title::before, .glitch-title::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            clip: rect(0, 0, 0, 0);
+        }
+        .glitch-title::before {
+            left: 2px;
+            text-shadow: -2px 0 #ff0055;
+            clip: rect(24px, 550px, 90px, 0);
+            animation: glitch-anim2 3s infinite linear alternate-reverse;
+        }
+        .glitch-title::after {
+            left: -2px;
+            text-shadow: -2px 0 #00ffcc;
+            clip: rect(85px, 550px, 140px, 0);
+            animation: glitch-anim3 2.5s infinite linear alternate-reverse;
+        }
+        @keyframes glitch-anim {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        @keyframes glitch-anim2 {
+            0% { clip: rect(15px, 9999px, 40px, 0); }
+            50% { clip: rect(60px, 9999px, 85px, 0); }
+            100% { clip: rect(10px, 9999px, 30px, 0); }
+        }
+        @keyframes glitch-anim3 {
+            0% { clip: rect(50px, 9999px, 80px, 0); }
+            50% { clip: rect(10px, 9999px, 45px, 0); }
+            100% { clip: rect(70px, 9999px, 95px, 0); }
+        }
+        /* Status Terminal */
+        .status-text {
+            font-size: 13px;
+            color: #ff0055;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 8px rgba(255, 0, 85, 0.7);
+            animation: pulseText 1s infinite alternate;
+        }
+        @keyframes pulseText {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        /* Data tersembunyi */
+        .hidden-data {
+            visibility: hidden;
+            position: absolute;
+            height: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background GIF Cyberpunk -->
+    <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjAyPejEqc95kB3gQxB6-f1b1jY7tRigQH8J0lyh9DQfZKes3sqbGKMxGhcZuI2tgZ28d5X-E19aoNwCiL9jEXzjf_Ch0KA9uCDwdc8q0i11EmzjLScvWYu4xTKjqARBHYYJJBCVdGeiaUgBlZ5o-X-PCbrXyB4N8PKol6MtWt-Sp-NkRM4txsz60EmsDQ/s1600/1000185762.gif" class="bg-gif">
+    
+    <!-- Huruf Melayang Tak Beraturan (A-Z) -->
+    <div class="matrix-rain" id="matrixContainer"></div>
+
+    <!-- Efek Layer tambahan -->
+    <div class="overlay"></div>
+    <div class="vignette"></div>
+
+    <!-- Tampilan Utama Cyber Pro dengan Kotak Transparan -->
+    <div class="cyber-container">
+        <div class="loader-ring"></div>
+        <div class="glitch-title" data-text="CYBER GATEWAY">ARI PASSCOD</div>
+        <p class="status-text">&gt;&gt; ESTABLISHING SECURE LINK... &lt;&lt;</p>
+    </div>
+
+    <!-- Kredensial Tersembunyi (Terbaca otomatis oleh GitHub Actions) -->
+    <div class="hidden-data">
+        <div>passcode:WIN11-ARNT-C6W4T,WIN11-ARNT-Y9K2-W4JT,WIN11-ARNT-G7B2-C9ME6, WIN11-ARNT-VVI8-9LVO3,Rahasia99, Kodeninja,WIN11-ARNT-X1E6-K8PF</div>
+        <div>user: cyberpunk_admin, operator_vps, superuser, anggachvlr </div>
+        <div>password: CyberP@ss2026!, SandiKuat123, RahasiaNegara99, anggachvlr123 </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('matrixContainer');
+        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        const count = 45;
+
+        for (let i = 0; i < count; i++) {
+            const span = document.createElement('div');
+            span.className = 'floating-char';
+            span.innerText = chars.charAt(Math.floor(Math.random() * chars.length));
+            
+            span.style.left = Math.random() * 100 + 'vw';
+            span.style.animationDuration = (Math.random() * 4 + 3) + 's';
+            span.style.animationDelay = (Math.random() * 5) + 's';
+            span.style.fontSize = (Math.random() * 10 + 14) + 'px';
+            
+            if(Math.random() > 0.5) {
+                span.style.color = 'rgba(255, 0, 85, 0.5)';
+                span.style.textShadow = '0 0 8px rgba(255, 0, 85, 0.8)';
+            }
+
+            container.appendChild(span);
+        }
+    </script>
+</body>
+</html>
