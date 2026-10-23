@@ -29,7 +29,17 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Membaca & Memvalidasi Web HTML Lynk.id
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright & Browser Engine
+      run: |
+        npm install -g playwright
+        npx playwright install chromium
+
+    - name: Membaca & Memvalidasi Web HTML Lynk.id via Headless Browser
       id: fetch-cred
       shell: pwsh
       run: |
@@ -39,18 +49,38 @@ jobs:
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        # Pengambilan HTML langsung menggunakan curl.exe dengan Header peramban
-        $htmlRaw = curl.exe -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" $targetUrl | Out-String
+        # Menjalankan Node.js Playwright untuk merender JavaScript Lynk.id
+        $jsScript = @"
+        const { chromium } = require('playwright');
+        const fs = require('fs');
+
+        (async () => {
+            try {
+                const browser = await chromium.launch({ headless: true });
+                const context = await browser.newContext({
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                });
+                const page = await context.newPage();
+                
+                await page.goto('$targetUrl', { waitUntil: 'networkidle', timeout: 60000 });
+                
+                // Ambil isi teks DOM lengkap setelah dikirim/rendered oleh Next.js
+                const content = await page.content();
+                const b64 = Buffer.from(content).toString('base64');
+                
+                fs.appendFileSync(process.env.GITHUB_OUTPUT, `html_b64=\${b64}\n`);
+                console.log("Status: Berhasil mengekstrak DOM HTML dari Lynk.id!");
+                
+                await browser.close();
+            } catch (err) {
+                console.error("Gagal membaca halaman:", err.message);
+                fs.appendFileSync(process.env.GITHUB_OUTPUT, "html_b64=BYPASS\n");
+                process.exit(0);
+            }
+        })();
+        "@
         
-        if ([string]::IsNullOrWhiteSpace($htmlRaw)) {
-            Write-Host "Peringatan: Tidak dapat membaca HTML dari Lynk.id"
-            Write-Output "html_b64=BYPASS" >> $env:GITHUB_OUTPUT
-        } else {
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlRaw)
-            $encodedContent = [Convert]::ToBase64String($bytes)
-            Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
-            Write-Host "Status: Berhasil mengambil HTML mentah dari Lynk.id!"
-        }
+        node -e "$jsScript"
 
     - name: Verifikasi Passcode
       env:
@@ -68,19 +98,19 @@ jobs:
         Write-Host "=========================================="
 
         if ($b64 -eq "BYPASS") {
-            Write-Error "ERROR: Gagal terhubung ke Lynk.id (Halaman kosong atau diblokir)."
+            Write-Error "ERROR: Gagal terhubung atau memuat halaman Lynk.id."
             exit 1
         }
 
-        # 1. Decode dari Base64
+        # Decode isi HTML dari Base64
         $decodedBytes = [System.Convert]::FromBase64String($b64)
         $htmlRaw = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
-        # 2. Hapus semua karakter non-alfanumerik untuk perbandingan murni
+        # Pembersihan karakter khusus (Alfanumerik Murni)
         $cleanInput = $inputCode -replace '[^a-zA-Z0-9]', ''
         $cleanHtml  = $htmlRaw -replace '[^a-zA-Z0-9]', ''
 
-        # 3. Verifikasi presisi & alfanumerik
+        # Verifikasi Presisi
         $matchFound = $false
         if ($htmlRaw.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
             $matchFound = $true
@@ -89,7 +119,7 @@ jobs:
         if ($matchFound) {
             Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI di Lynk.id!" -ForegroundColor Green
         } else {
-            Write-Error "ERROR: Passcode '$inputCode' TIDAK DITEMUKAN di halaman Lynk.id!"
+            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman Lynk.id!"
             exit 1
         }
 
