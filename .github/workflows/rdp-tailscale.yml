@@ -1,4 +1,4 @@
-name: Windows RDP Cyberpunk
+name: Windows RDP Apha vortex
 
 on:
   workflow_dispatch:
@@ -114,7 +114,7 @@ jobs:
         $desktopPath = [Environment]::GetFolderPath('CommonDesktopDirectory')
         if (-not (Test-Path $desktopPath)) { $desktopPath = "C:\Users\Public\Desktop" }
         
-        $msgContent = "======================================`nMILIK ARIANTO`n======================`nDesktop free terima kasih sudah beli token`ndan semoga lancar rezeki sehat selalu.`n======================`n@Arianto 2026 Lumajang Candipuro`n@WhatsApp 0831-2211-6267"
+        $msgContent = "======================================`nMILIK ARIANTO`n======================`nDesktop free terimakasih sudah beli token`ndan semoga lancar rezeki sehat selalu.`n======================`n@Arianto 2026 Lumajang Candipuro`n@WhatsApp 0831-2211-6267"
         
         Set-Content -Path "$desktopPath\INFORMASI_PEMILIK_VPS.txt" -Value $msgContent -Encoding UTF8
         Write-Output "File informasi teks berhasil dibuat di desktop."
