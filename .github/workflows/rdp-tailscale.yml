@@ -29,18 +29,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-
-    - name: Install Playwright & Browser Engine Locally
-      run: |
-        npm init -y
-        npm install playwright
-        npx playwright install chromium
-
-    - name: Membaca & Memvalidasi Web HTML Lynk.id via Headless Browser
+    - name: Membaca & Memvalidasi Web Lynk.id via Reader API
       id: fetch-cred
       shell: pwsh
       run: |
@@ -50,37 +39,25 @@ jobs:
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        $jsScript = @'
-        const { chromium } = require('playwright');
-        const fs = require('fs');
-
-        (async () => {
-            try {
-                const browser = await chromium.launch({ headless: true });
-                const context = await browser.newContext({
-                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-                });
-                const page = await context.newPage();
-                
-                await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle', timeout: 60000 });
-                
-                const content = await page.content();
-                const b64 = Buffer.from(content).toString('base64');
-                
-                fs.appendFileSync(process.env.GITHUB_OUTPUT, `html_b64=${b64}\n`);
-                console.log("Status: Berhasil mengekstrak DOM HTML dari Lynk.id!");
-                
-                await browser.close();
-            } catch (err) {
-                console.error("Gagal membaca halaman:", err.message);
-                fs.appendFileSync(process.env.GITHUB_OUTPUT, "html_b64=BYPASS\n");
-                process.exit(0);
-            }
-        })();
-        '@
+        # Menggunakan Jina Reader API untuk bypass Cloudflare & JavaScript Lynk.id secara instan
+        $readerUrl = "https://r.jina.ai/$targetUrl"
         
-        $env:TARGET_URL = $targetUrl
-        node -e "$jsScript"
+        try {
+            $response = Invoke-WebRequest -Uri $readerUrl -UseBasicParsing -Headers @{ "Accept" = "text/plain" }
+            $htmlContent = $response.Content
+        } catch {
+            throw "Gagal mengambil data dari Lynk.id via Reader API: $_"
+        }
+        
+        if ([string]::IsNullOrWhiteSpace($htmlContent)) {
+            throw "Gagal total: Konten dari Lynk.id kosong."
+        }
+        
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlContent)
+        $encodedContent = [Convert]::ToBase64String($bytes)
+        
+        Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
+        Write-Host "Status: Berhasil membaca halaman Lynk.id!"
 
     - name: Verifikasi Passcode
       env:
@@ -97,12 +74,7 @@ jobs:
         Write-Host "INPUT PASSCODE ANDA : '$inputCode'"
         Write-Host "=========================================="
 
-        if ($b64 -eq "BYPASS") {
-            Write-Error "ERROR: Gagal terhubung atau memuat halaman Lynk.id."
-            exit 1
-        }
-
-        # Decode isi HTML dari Base64
+        # Decode isi teks dari Base64
         $decodedBytes = [System.Convert]::FromBase64String($b64)
         $htmlRaw = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
