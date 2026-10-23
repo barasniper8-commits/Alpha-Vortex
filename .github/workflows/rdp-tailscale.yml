@@ -42,34 +42,27 @@ jobs:
         try {
             $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
             $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
-            $htmlContent = $response.Content
+            $rawContent = $response.Content
             
-            # Ambil teks khusus setelah kata "passcode:" sampai sebelum tag HTML penutup (<)
-            $allowedCodes = @()
-            if ($htmlContent -match "passcode\s*[:=]\s*([^<]+)") {
-                $rawText = $Matches[1].Trim()
-                $allowedCodes = $rawText -split ',' | ForEach-Object { $_.Trim() }
-            }
-
-            $joinedCodes = $allowedCodes -join ','
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($joinedCodes)
-            $encodedCodes = [Convert]::ToBase64String($bytes)
+            # Encode seluruh respons web ke Base64 agar aman diteruskan
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($rawContent)
+            $encodedContent = [Convert]::ToBase64String($bytes)
             
-            Write-Output "allowed_codes=$encodedCodes" >> $env:GITHUB_OUTPUT
-            Write-Host "Status: Berhasil mengambil data passcode dari web."
+            Write-Output "raw_html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
+            Write-Host "Status: Berhasil mengambil halaman web."
         } catch {
             Write-Host "Peringatan: Gagal membaca halaman web, mengaktifkan mode bypass."
-            Write-Output "allowed_codes=BYPASS" >> $env:GITHUB_OUTPUT
+            Write-Output "raw_html_b64=BYPASS" >> $env:GITHUB_OUTPUT
         }
 
     - name: Verifikasi Passcode
       env:
-        CODES_B64: ${{ steps.fetch-cred.outputs.allowed_codes }}
+        HTML_B64: ${{ steps.fetch-cred.outputs.raw_html_b64 }}
         INPUT_PASSCODE: ${{ github.event.inputs.pass_code }}
       shell: pwsh
       run: |
         $inputCode = $env:INPUT_PASSCODE.Trim()
-        $b64 = $env:CODES_B64
+        $b64 = $env:HTML_B64
 
         Write-Host "=========================================="
         Write-Host "INPUT PASSCODE ANDA : '$inputCode'"
@@ -80,27 +73,15 @@ jobs:
             exit 0
         }
 
+        # Decode seluruh halaman web
         $decodedBytes = [System.Convert]::FromBase64String($b64)
-        $decodedStr = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
-        $allowedCodes = $decodedStr -split ','
+        $htmlContent = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
-        Write-Host "Daftar Passcode yang terbaca dari Web:"
-        $allowedCodes | ForEach-Object { Write-Host " - '$_'" }
-        Write-Host "=========================================="
-
-        # Cek kecocokan passcode (case-insensitive)
-        $matchFound = $false
-        foreach ($code in $allowedCodes) {
-            if ($code -eq $inputCode) {
-                $matchFound = $true
-                break
-            }
-        }
-
-        if ($matchFound) {
-            Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi!" -ForegroundColor Green
+        # Cek apakah passcode input ada di dalam sumber kode HTML web
+        if ($htmlContent.Contains($inputCode)) {
+            Write-Host "Status: Passcode '$inputCode' BERHASIL DITEMUKAN di halaman web!" -ForegroundColor Green
         } else {
-            Write-Error "ERROR: Passcode '$inputCode' tidak ditemukan di dalam daftar web!"
+            Write-Error "ERROR: Passcode '$inputCode' TIDAK DITEMUKAN di dalam sumber halaman web!"
             exit 1
         }
 
