@@ -34,7 +34,7 @@ jobs:
       shell: pwsh
       run: |
         # Ganti dengan URL GitHub Pages Anda sendiri
-        $targetUrl = "https://barasniper8-commits.github.io/Alpha-Vortex/"
+        $targetUrl = "https://arianto12.lynk.id/p/ganjay"
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
