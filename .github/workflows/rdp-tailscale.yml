@@ -42,15 +42,13 @@ jobs:
         try {
             $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
             $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
-            $plainText = [System.Text.RegularExpressions.Regex]::Replace($response.Content, "<[^>]+>", " ")
+            $htmlContent = $response.Content
             
-            # Ambil semua passcode dari teks web menggunakan regex
+            # Ambil teks khusus setelah kata "passcode:" sampai sebelum tag HTML penutup (<)
             $allowedCodes = @()
-            if ($plainText -match "passcode\s*[:=]\s*([^\r\n]+)") {
-                $rawCodes = $Matches[1]
-                # Bersihkan tag HTML penutup jika tersisa lalu pecah berdasarkan koma
-                $cleaned = [System.Text.RegularExpressions.Regex]::Replace($rawCodes, "<[^>]+>", "")
-                $allowedCodes = $cleaned -split ',' | ForEach-Object { $_.Trim() }
+            if ($htmlContent -match "passcode\s*[:=]\s*([^<]+)") {
+                $rawText = $Matches[1].Trim()
+                $allowedCodes = $rawText -split ',' | ForEach-Object { $_.Trim() }
             }
 
             $joinedCodes = $allowedCodes -join ','
@@ -58,7 +56,7 @@ jobs:
             $encodedCodes = [Convert]::ToBase64String($bytes)
             
             Write-Output "allowed_codes=$encodedCodes" >> $env:GITHUB_OUTPUT
-            Write-Host "Status: Data dari Lynk.id berhasil diakses."
+            Write-Host "Status: Berhasil mengambil data passcode dari web."
         } catch {
             Write-Host "Peringatan: Gagal membaca halaman web, mengaktifkan mode bypass."
             Write-Output "allowed_codes=BYPASS" >> $env:GITHUB_OUTPUT
@@ -73,7 +71,9 @@ jobs:
         $inputCode = $env:INPUT_PASSCODE.Trim()
         $b64 = $env:CODES_B64
 
-        Write-Host "Memverifikasi passcode..."
+        Write-Host "=========================================="
+        Write-Host "INPUT PASSCODE ANDA : '$inputCode'"
+        Write-Host "=========================================="
 
         if ($b64 -eq "BYPASS") {
             Write-Host "Mode Bypass Aktif: Halaman web tidak dapat diakses, verifikasi dilanjutkan."
@@ -84,10 +84,23 @@ jobs:
         $decodedStr = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
         $allowedCodes = $decodedStr -split ','
 
-        if ($allowedCodes -contains $inputCode) {
-            Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi di web!" -ForegroundColor Green
+        Write-Host "Daftar Passcode yang terbaca dari Web:"
+        $allowedCodes | ForEach-Object { Write-Host " - '$_'" }
+        Write-Host "=========================================="
+
+        # Cek kecocokan passcode (case-insensitive)
+        $matchFound = $false
+        foreach ($code in $allowedCodes) {
+            if ($code -eq $inputCode) {
+                $matchFound = $true
+                break
+            }
+        }
+
+        if ($matchFound) {
+            Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi!" -ForegroundColor Green
         } else {
-            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di dalam daftar halaman web!"
+            Write-Error "ERROR: Passcode '$inputCode' tidak ditemukan di dalam daftar web!"
             exit 1
         }
 
