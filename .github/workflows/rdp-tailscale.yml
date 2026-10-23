@@ -3,10 +3,6 @@ name: Windows RDP Cyberpunk
 on:
   workflow_dispatch:
     inputs:
-      pass_code:
-        description: 'Pass Kode'
-        required: true
-        type: string
       input_user:
         description: 'Username RDP'
         required: true
@@ -28,47 +24,6 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
-
-    - name: Verifikasi Passcode dari Lynk.id (Tanpa Node.js)
-      env:
-        INPUT_PASSCODE: ${{ github.event.inputs.pass_code }}
-      shell: pwsh
-      run: |
-        Add-Type -AssemblyName System.Web
-        $targetUrl = "https://arianto12.lynk.id/p/ganjay"
-        $inputCode = $env:INPUT_PASSCODE.Trim()
-
-        Write-Host "Mengambil data dari: $targetUrl"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
-        $headers = @{
-            "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        }
-
-        try {
-            $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
-            $htmlRaw = $response.Content
-        } catch {
-            Write-Warning "Gagal terhubung ke Lynk.id: $_"
-            $htmlRaw = ""
-        }
-
-        $htmlDecoded = [System.Web.HttpUtility]::UrlDecode($htmlRaw)
-        $htmlDecoded = [System.Web.HttpUtility]::HtmlDecode($htmlDecoded)
-
-        $cleanInput = $inputCode -replace '[^a-zA-Z0-9]', ''
-        $cleanHtml  = $htmlDecoded -replace '[^a-zA-Z0-9]', ''
-
-        $matchFound = $false
-        if ($htmlRaw.Contains($inputCode) -or $htmlDecoded.Contains($inputCode) -or $cleanHtml.Contains($cleanInput)) {
-            $matchFound = $true
-        }
-
-        if ($matchFound) {
-            Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI!" -ForegroundColor Green
-        } else {
-            Write-Error "ERROR: Passcode '$inputCode' TIDAK DITEMUKAN di halaman Lynk.id!"
-            exit 1
-        }
 
     - name: Konfigurasi Tampilan Dark Mode
       shell: pwsh
