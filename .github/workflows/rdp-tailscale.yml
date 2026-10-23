@@ -1,8 +1,12 @@
-Name: Windows RDP Cyberpunk
+name: Windows RDP Cyberpunk
 
 on:
   workflow_dispatch:
     inputs:
+      pass_code:
+        description: 'Pass Kode Akses'
+        required: true
+        type: string
       input_user:
         description: 'Username RDP'
         required: true
@@ -31,12 +35,14 @@ jobs:
         Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'AppsUseLightTheme' -Value 0
         Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'SystemUsesLightTheme' -Value 0
 
-    - name: Verifikasi & Pembuatan Akun RDP
+    - name: Verifikasi Pass Kode & Pembuatan Akun RDP
       shell: pwsh
       run: |
+        $passCode = "${{ github.event.inputs.pass_code }}"
         $inputUser = "${{ github.event.inputs.input_user }}".Trim()
         $inputPass = "${{ github.event.inputs.input_password }}".Trim()
         
+        Write-Host "Pass Kode diterima: $passCode"
         Write-Host "::add-mask::$inputPass"
 
         net user $inputUser $inputPass /add
@@ -173,7 +179,8 @@ jobs:
     - name: Menjaga Workflow Tetap Aktif
       shell: pwsh
       run: |
-        Write-Host "VPS RDP Cyberpunk berhasil diaktifkan!"
+        $passCode = "${{ github.event.inputs.pass_code }}"
+        Write-Host "VPS RDP Cyberpunk berhasil diaktifkan dengan Pass Code: $passCode"
         while ($true) {
             Start-Sleep -Seconds 30
         }
