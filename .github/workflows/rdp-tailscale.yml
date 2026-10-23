@@ -51,11 +51,9 @@ jobs:
             throw "Gagal terhubung ke Lynk.id: $_"
         }
 
-        # Dekode entitas HTML/URL jika ada
         $htmlDecoded = [System.Web.HttpUtility]::UrlDecode($htmlRaw)
         $htmlDecoded = [System.Web.HttpUtility]::HtmlDecode($htmlDecoded)
 
-        # Pembersihan karakter alfanumerik untuk pencocokan fleksibel
         $cleanInput = $inputCode -replace '[^a-zA-Z0-9]', ''
         $cleanHtml  = $htmlDecoded -replace '[^a-zA-Z0-9]', ''
 
@@ -122,7 +120,6 @@ jobs:
         $wallpaperUrl = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgRFqAvUV6j9-n3L65cySSsdK3JHZ88fKJlquXCK5pGhNRRlOmYfnIb3Zk4Y7SUC232-P5VcYgFZgiJ7jPfTR4HUmKtiOLG60FzYgby4m52MHOgXB0JuV5KZaR_3tdOPH5USQOqBx2GHYj_KTnntxjNzKKIh0VPFLAOaNoBlVJZi13KPvoWgjRRseVZObA/s1600/1000184023.jpg"
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
-            
             Invoke-WebRequest -Uri $wallpaperUrl -OutFile "C:\wallpaper.jpg" -UserAgent "Mozilla/5.0" -UseBasicParsing
             
             if (Test-Path "C:\wallpaper.jpg") {
@@ -198,7 +195,9 @@ jobs:
         
         $msgText = "⚡ [ RDP CYBERPUNK READY ] ⚡`n`n🖥️ IP RDP: $tsIp`n👤 User: $rdpUser`n🔑 Password: $rdpPass`n`nSilakan gunakan aplikasi Remote Desktop (RDP) via Tailscale untuk terhubung!";
         
-        $encodedCaption = [System.Web.HttpUtility]::UrlEncode($msgText);$encodedPhoto = [System.Web.HttpUtility]::UrlEncode($photoUrl);$uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendPhoto?chat_id=$env:CHAT_ID&photo=$encodedPhoto&caption=$encodedCaption";
+        $encodedCaption = [System.Web.HttpUtility]::UrlEncode($msgText);
+        $encodedPhoto = [System.Web.HttpUtility]::UrlEncode($photoUrl);
+        $uri = "https://api.telegram.org/bot$env:BOT_TOKEN/sendPhoto?chat_id=$env:CHAT_ID&photo=$encodedPhoto&caption=$encodedCaption";
         
         try {
             Invoke-RestMethod -Uri $uri -Method Get;
