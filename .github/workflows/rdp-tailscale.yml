@@ -42,54 +42,44 @@ jobs:
         try {
             $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
             $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
-            $webContent = $response.Content
+            $plainText = [System.Text.RegularExpressions.Regex]::Replace($response.Content, "<[^>]+>", " ")
             
-            $plainText = [System.Text.RegularExpressions.Regex]::Replace($webContent, "<[^>]+>", " ")
+            # Encode teks ke Base64 agar aman ditransfer tanpa merusak sintaks shell
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($plainText)
+            $encodedText = [Convert]::ToBase64String($bytes)
             
-            $validPassCodes = @()
-            $validUsers = @()
-            $validPasswords = @()
-
-            if ($plainText -match "passcode\s*[:=]\s*([^\r\n]+)") {
-                $validPassCodes = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
-            }
-            if ($plainText -match "user\s*[:=]\s*([^\r\n]+)") {
-                $validUsers = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
-            }
-            if ($plainText -match "password\s*[:=]\s*([^\r\n]+)") {
-                $validPasswords = $Matches[1].Trim() -split ',' | ForEach-Object { $_.Trim() }
-            }
-
-            if ($validPassCodes.Count -eq 0) { $validPassCodes = @($plainText -split '\s+') }
-            if ($validUsers.Count -eq 0) { $validUsers = @("${{ github.event.inputs.input_user }}") }
-            if ($validPasswords.Count -eq 0) { $validPasswords = @("${{ github.event.inputs.input_password }}") }
-
-            Write-Output "web_paskodes=$($validPassCodes -join ',')" >> $env:GITHUB_OUTPUT
-            Write-Output "web_users=$($validUsers -join ',')" >> $env:GITHUB_OUTPUT
-            Write-Output "web_passwords=$($validPasswords -join ',')" >> $env:GITHUB_OUTPUT
-            
+            Write-Output "page_text=$encodedText" >> $env:GITHUB_OUTPUT
             Write-Host "Status: Data dari Lynk.id berhasil diakses."
         } catch {
-            Write-Host "Peringatan: Gagal membaca halaman web, melanjutkan proses dengan input pengguna."
-            Write-Output "web_paskodes=bypass" >> $env:GITHUB_OUTPUT
-            Write-Output "web_users=${{ github.event.inputs.input_user }}" >> $env:GITHUB_OUTPUT
-            Write-Output "web_passwords=${{ github.event.inputs.input_password }}" >> $env:GITHUB_OUTPUT
+            Write-Host "Peringatan: Gagal membaca halaman web, mengaktifkan mode bypass."
+            Write-Output "page_text=BYPASS" >> $env:GITHUB_OUTPUT
         }
 
     - name: Verifikasi Passcode
+      env:
+        PAGE_TEXT_B64: ${{ steps.fetch-cred.outputs.page_text }}
+        INPUT_PASSCODE: ${{ github.event.inputs.pass_code }}
       shell: pwsh
       run: |
-        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
-        $allowedPassCodes = "${{ steps.fetch-cred.outputs.web_paskodes }}".Split(',') | ForEach-Object { $_.Trim() }
+        $inputCode = $env:INPUT_PASSCODE.Trim()
+        $b64 = $env:PAGE_TEXT_B64
 
         Write-Host "Memverifikasi passcode..."
 
-        if ($allowedPassCodes -contains "bypass") {
+        if ($b64 -eq "BYPASS") {
             Write-Host "Mode Bypass Aktif: Halaman web tidak dapat diakses, verifikasi dilanjutkan."
-        } elseif ($allowedPassCodes -contains $inputPassCode) {
-            Write-Host "Status: Passcode COCOK dan terverifikasi!" -ForegroundColor Green
+            exit 0
+        }
+
+        # Decode kembali teks halaman web
+        $decodedBytes = [System.Convert]::FromBase64String($b64)
+        $pageText = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
+
+        # Cek apakah passcode input ada di dalam teks halaman web
+        if ($pageText -match [System.Text.RegularExpressions.Regex]::Escape($inputCode)) {
+            Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi di web!" -ForegroundColor Green
         } else {
-            Write-Error "ERROR: Passcode '$inputPassCode' SALAH atau TIDAK DITEMUKAN di halaman web!"
+            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman web!"
             exit 1
         }
 
