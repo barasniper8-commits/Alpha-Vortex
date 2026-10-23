@@ -29,6 +29,14 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Cloudflare Bypass Tool
+      run: pip install cloudscraper
+
     - name: Membaca & Memvalidasi Web HTML Lynk.id
       id: fetch-cred
       shell: pwsh
@@ -39,28 +47,27 @@ jobs:
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        # Menggunakan metode web client dengan bypass SSL & Header lengkap agar tembus Cloudflare Lynk.id
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
-        $wc = New-Object System.Net.WebClient
-        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-        $wc.Headers.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+        # Jalankan Python untuk menembus Cloudflare Lynk.id
+        $pyCode = @"
+        import cloudscraper
+        import base64
+        import os
+
+        scraper = cloudscraper.create_scraper()
+        try:
+            res = scraper.get("$targetUrl")
+            html = res.text
+            b64 = base64.b64encode(html.encode('utf-8')).decode('utf-8')
+            with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                fh.write(f"html_b64={b64}\n")
+            print("Status: Berhasil melewati Cloudflare dan mengambil HTML!")
+        except Exception as e:
+            print(f"Peringatan: Gagal total: {e}")
+            with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                fh.write("html_b64=BYPASS\n")
+        "@
         
-        try {
-            $htmlContent = $wc.DownloadString($targetUrl)
-        } catch {
-            # Cadangan menggunakan curl jika web client gagal
-            $htmlContent = curl.exe -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" $targetUrl | Out-String
-        }
-        
-        if ([string]::IsNullOrWhiteSpace($htmlContent)) {
-            throw "Gagal total: Konten HTML dari Lynk.id kosong."
-        }
-        
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlContent)
-        $encodedContent = [Convert]::ToBase64String($bytes)
-        
-        Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
-        Write-Host "Status: Berhasil menarik halaman HTML Lynk.id!"
+        $pyCode | python -
 
     - name: Verifikasi Passcode
       env:
@@ -77,23 +84,19 @@ jobs:
         Write-Host "INPUT PASSCODE ANDA : '$inputCode'"
         Write-Host "=========================================="
 
+        if ($b64 -eq "BYPASS") {
+            Write-Error "ERROR: Gagal terhubung ke Lynk.id akibat proteksi Cloudflare."
+            exit 1
+        }
+
         $decodedBytes = [System.Convert]::FromBase64String($b64)
         $htmlContent = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
-        # Mengambil semua teks di dalam elemen hidden-data passcode HTML
         $allowedCodes = @()
         if ($htmlContent -match "passcode\s*[:=]\s*([^<]+)") {
             $rawText = $Matches[1].Trim()
             $allowedCodes = $rawText -split ',' | ForEach-Object { $_.Trim() }
         }
-
-        Write-Host "Daftar Passcode yang terbaca dari Lynk.id:"
-        if ($allowedCodes.Count -gt 0) {
-            $allowedCodes | ForEach-Object { Write-Host " - '$_'" }
-        } else {
-            Write-Host " (Pencarian fleksibel diaktifkan...)"
-        }
-        Write-Host "=========================================="
 
         $matchFound = $false
         foreach ($code in $allowedCodes) {
@@ -103,7 +106,6 @@ jobs:
             }
         }
 
-        # Validasi ganda memeriksa kecocokan di seluruh isi HTML
         if (-not $matchFound -and $htmlContent.Contains($inputCode)) {
             $matchFound = $true
         }
@@ -111,7 +113,7 @@ jobs:
         if ($matchFound) {
             Write-Host "Status: Passcode '$inputCode' KETEMU dan TERVERIFIKASI!" -ForegroundColor Green
         } else {
-            Write-Error "ERROR: Passcode '$inputCode' TIDAK KETEMU di halaman Lynk.id!"
+            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman Lynk.id!"
             exit 1
         }
 
