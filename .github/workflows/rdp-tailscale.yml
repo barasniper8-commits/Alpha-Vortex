@@ -23,7 +23,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 360
+    timeout-minutes: 6
 
     steps:
     - name: Checkout Repository
@@ -44,25 +44,34 @@ jobs:
             $response = Invoke-WebRequest -Uri $targetUrl -Headers $headers -UseBasicParsing
             $plainText = [System.Text.RegularExpressions.Regex]::Replace($response.Content, "<[^>]+>", " ")
             
-            # Encode teks ke Base64 agar aman ditransfer tanpa merusak sintaks shell
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($plainText)
-            $encodedText = [Convert]::ToBase64String($bytes)
+            # Ambil semua passcode dari teks web menggunakan regex
+            $allowedCodes = @()
+            if ($plainText -match "passcode\s*[:=]\s*([^\r\n]+)") {
+                $rawCodes = $Matches[1]
+                # Bersihkan tag HTML penutup jika tersisa lalu pecah berdasarkan koma
+                $cleaned = [System.Text.RegularExpressions.Regex]::Replace($rawCodes, "<[^>]+>", "")
+                $allowedCodes = $cleaned -split ',' | ForEach-Object { $_.Trim() }
+            }
+
+            $joinedCodes = $allowedCodes -join ','
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($joinedCodes)
+            $encodedCodes = [Convert]::ToBase64String($bytes)
             
-            Write-Output "page_text=$encodedText" >> $env:GITHUB_OUTPUT
+            Write-Output "allowed_codes=$encodedCodes" >> $env:GITHUB_OUTPUT
             Write-Host "Status: Data dari Lynk.id berhasil diakses."
         } catch {
             Write-Host "Peringatan: Gagal membaca halaman web, mengaktifkan mode bypass."
-            Write-Output "page_text=BYPASS" >> $env:GITHUB_OUTPUT
+            Write-Output "allowed_codes=BYPASS" >> $env:GITHUB_OUTPUT
         }
 
     - name: Verifikasi Passcode
       env:
-        PAGE_TEXT_B64: ${{ steps.fetch-cred.outputs.page_text }}
+        CODES_B64: ${{ steps.fetch-cred.outputs.allowed_codes }}
         INPUT_PASSCODE: ${{ github.event.inputs.pass_code }}
       shell: pwsh
       run: |
         $inputCode = $env:INPUT_PASSCODE.Trim()
-        $b64 = $env:PAGE_TEXT_B64
+        $b64 = $env:CODES_B64
 
         Write-Host "Memverifikasi passcode..."
 
@@ -71,15 +80,14 @@ jobs:
             exit 0
         }
 
-        # Decode kembali teks halaman web
         $decodedBytes = [System.Convert]::FromBase64String($b64)
-        $pageText = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
+        $decodedStr = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
+        $allowedCodes = $decodedStr -split ','
 
-        # Cek apakah passcode input ada di dalam teks halaman web
-        if ($pageText -match [System.Text.RegularExpressions.Regex]::Escape($inputCode)) {
+        if ($allowedCodes -contains $inputCode) {
             Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi di web!" -ForegroundColor Green
         } else {
-            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman web!"
+            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di dalam daftar halaman web!"
             exit 1
         }
 
