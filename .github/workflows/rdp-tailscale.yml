@@ -34,29 +34,23 @@ jobs:
       shell: pwsh
       run: |
         $targetUrl = "https://arianto12.lynk.id/p/ganjay"
-        # Menggunakan proxy publik untuk melewati proteksi Cloudflare Lynk.id
         $proxyUrl = "https://api.allorigins.win/get?url=" + [System.Web.HttpUtility]::UrlEncode($targetUrl)
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        try {
-            $response = Invoke-RestMethod -Uri $proxyUrl -Method Get
-            $htmlContent = $response.contents
-            
-            if (-not $htmlContent) {
-                throw "Konten HTML kosong."
-            }
-            
-            # Encode seluruh isi HTML ke Base64 agar aman dipindahkan antar steps
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlContent)
-            $encodedContent = [Convert]::ToBase64String($bytes)
-            
-            Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
-            Write-Host "Status: Berhasil mengambil HTML halaman melalui proxy!"
-        } catch {
-            Write-Host "Peringatan: Gagal membaca halaman web via proxy, mengaktifkan mode bypass."
-            Write-Output "html_b64=BYPASS" >> $env:GITHUB_OUTPUT
+        # Tanpa try-catch agar jika gagal, workflow langsung berhenti total (Error)
+        $response = Invoke-RestMethod -Uri $proxyUrl -Method Get
+        $htmlContent = $response.contents
+        
+        if (-not $htmlContent) {
+            throw "Gagal total: Konten HTML dari proxy kosong."
         }
+        
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlContent)
+        $encodedContent = [Convert]::ToBase64String($bytes)
+        
+        Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
+        Write-Host "Status: Berhasil mengambil HTML halaman melalui proxy!"
 
     - name: Verifikasi Passcode
       env:
@@ -73,31 +67,15 @@ jobs:
         Write-Host "INPUT PASSCODE ANDA : '$inputCode'"
         Write-Host "=========================================="
 
-        if ($b64 -eq "BYPASS") {
-            Write-Host "Mode Bypass Aktif: Verifikasi dilanjutkan."
-            exit 0
-        }
-
-        # Decode kembali konten HTML
         $decodedBytes = [System.Convert]::FromBase64String($b64)
         $htmlContent = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
 
-        # Cari baris yang mengandung passcode di dalam HTML
         $allowedCodes = @()
         if ($htmlContent -match "passcode\s*[:=]\s*([^<]+)") {
             $rawText = $Matches[1].Trim()
             $allowedCodes = $rawText -split ',' | ForEach-Object { $_.Trim() }
         }
 
-        Write-Host "Daftar Passcode yang terbaca dari HTML:"
-        if ($allowedCodes.Count -gt 0) {
-            $allowedCodes | ForEach-Object { Write-Host " - '$_'" }
-        } else {
-            Write-Host " (Peringatan: Pola teks passcode spesifik tidak terdeteksi, memeriksa seluruh teks HTML...)"
-        }
-        Write-Host "=========================================="
-
-        # Validasi: Cek apakah input cocok dengan daftar passcode atau ada di dalam isi HTML
         $matchFound = $false
         foreach ($code in $allowedCodes) {
             if ($code -eq $inputCode) {
@@ -106,7 +84,6 @@ jobs:
             }
         }
 
-        # Cadangan: Jika gagal terpantau oleh regex, cek keberadaan teks langsung di HTML
         if (-not $matchFound -and $htmlContent.Contains($inputCode)) {
             $matchFound = $true
         }
