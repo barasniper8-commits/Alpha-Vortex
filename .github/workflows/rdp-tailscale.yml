@@ -33,24 +33,28 @@ jobs:
       id: fetch-cred
       shell: pwsh
       run: |
-        $targetUrl = "https://arianto12.lynk.id/p/ganjay"
-        $proxyUrl = "https://api.allorigins.win/get?url=" + [System.Web.HttpUtility]::UrlEncode($targetUrl)
+        $u1 = "https://arianto1"
+        $u2 = "2.lynk.id/p/ganjay"
+        $targetUrl = "$u1$u2"
+        
+        # Menggunakan CodeTabs Proxy dengan URL terpisah
+        $proxyUrl = "https://api.codetabs.com/v1/proxy?url=" + [System.Web.HttpUtility]::UrlEncode($targetUrl)
         
         [Console]::WriteLine("::add-mask::$targetUrl")
         
-        # Tanpa try-catch agar jika gagal, workflow langsung berhenti total (Error)
-        $response = Invoke-RestMethod -Uri $proxyUrl -Method Get
-        $htmlContent = $response.contents
+        $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+        $response = Invoke-WebRequest -Uri $proxyUrl -Headers $headers -UseBasicParsing
+        $htmlContent = $response.Content
         
         if (-not $htmlContent) {
-            throw "Gagal total: Konten HTML dari proxy kosong."
+            throw "Gagal total: Konten HTML dari halaman Lynk.id kosong."
         }
         
         $bytes = [System.Text.Encoding]::UTF8.GetBytes($htmlContent)
         $encodedContent = [Convert]::ToBase64String($bytes)
         
         Write-Output "html_b64=$encodedContent" >> $env:GITHUB_OUTPUT
-        Write-Host "Status: Berhasil mengambil HTML halaman melalui proxy!"
+        Write-Host "Status: Berhasil mengambil HTML halaman Lynk.id!"
 
     - name: Verifikasi Passcode
       env:
@@ -89,9 +93,9 @@ jobs:
         }
 
         if ($matchFound) {
-            Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi!" -ForegroundColor Green
+            Write-Host "Status: Passcode '$inputCode' COCOK dan terverifikasi di halaman Lynk.id!" -ForegroundColor Green
         } else {
-            Write-Error "ERROR: Passcode '$inputCode' TIDAK DITEMUKAN di dalam HTML Lynk.id!"
+            Write-Error "ERROR: Passcode '$inputCode' SALAH atau TIDAK DITEMUKAN di halaman Lynk.id!"
             exit 1
         }
 
