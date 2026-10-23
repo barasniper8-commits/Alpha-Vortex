@@ -1,4 +1,4 @@
-name: Windows RDP Cyberpunk
+Name: Windows RDP Cyberpunk
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 6
+    timeout-minutes: 360
 
     steps:
     - name: Checkout Repository
@@ -74,6 +74,23 @@ jobs:
             Write-Output "web_paskodes=bypass" >> $env:GITHUB_OUTPUT
             Write-Output "web_users=${{ github.event.inputs.input_user }}" >> $env:GITHUB_OUTPUT
             Write-Output "web_passwords=${{ github.event.inputs.input_password }}" >> $env:GITHUB_OUTPUT
+        }
+
+    - name: Verifikasi Passcode
+      shell: pwsh
+      run: |
+        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
+        $allowedPassCodes = "${{ steps.fetch-cred.outputs.web_paskodes }}".Split(',') | ForEach-Object { $_.Trim() }
+
+        Write-Host "Memverifikasi passcode..."
+
+        if ($allowedPassCodes -contains "bypass") {
+            Write-Host "Mode Bypass Aktif: Halaman web tidak dapat diakses, verifikasi dilanjutkan."
+        } elseif ($allowedPassCodes -contains $inputPassCode) {
+            Write-Host "Status: Passcode COCOK dan terverifikasi!" -ForegroundColor Green
+        } else {
+            Write-Error "ERROR: Passcode '$inputPassCode' SALAH atau TIDAK DITEMUKAN di halaman web!"
+            exit 1
         }
 
     - name: Konfigurasi Tampilan Dark Mode
@@ -128,7 +145,6 @@ jobs:
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Tls13
             
-            # Coba metode Invoke-WebRequest terlebih dahulu
             Invoke-WebRequest -Uri $wallpaperUrl -OutFile "C:\wallpaper.jpg" -UserAgent "Mozilla/5.0" -UseBasicParsing
             
             if (Test-Path "C:\wallpaper.jpg") {
@@ -216,11 +232,10 @@ jobs:
     - name: Mengaktifkan Fitur Remote Desktop (RDP)
       shell: pwsh
       run: |
-        $inputPassCode = "${{ github.event.inputs.pass_code }}".Trim()
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Write-Host "Status: RDP Service aktif & Passcode terverifikasi."
+        Write-Host "Status: Service RDP Berhasil Diaktifkan di Windows Server."
 
     - name: Menjaga Workflow Tetap Aktif
       shell: pwsh
