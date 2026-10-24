@@ -45,6 +45,13 @@ jobs:
         Write-Host "Pass Kode diterima: $passCode"
         Write-Host "::add-mask::$inputPass"
 
+        # Cek apakah akun sudah ada. Jika ada, hapus dulu agar tidak error 1378 / exit code 1
+        $existingUser = Get-LocalUser -Name $inputUser -ErrorAction SilentlyContinue
+        if ($existingUser) {
+            Write-Host "Akun '$inputUser' sudah ada di sistem. Menghapus akun lama..."
+            net user $inputUser /delete
+        }
+
         net user $inputUser $inputPass /add
         net localgroup administrators $inputUser /add
         Write-Host "Status: Akun RDP '$inputUser' berhasil dibuat dan berstatus Administrator."
